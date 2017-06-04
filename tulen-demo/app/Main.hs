@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Game.Tulen.Demo
 
 main :: IO ()
-main = someFunc
+main = runDemo
