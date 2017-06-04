@@ -39,6 +39,14 @@ packages:
 - 'tulen-api'
 - 'tulen-core'
 - 'tulen-demo'
+- location:
+    git: https://github.com/tulen-engine/tulen-script.git
+    commit: 72636ba2988e147edbc6b76f9440a953c1b1f15c
+  extra-dep: true
+- location:
+    git: https://github.com/Teaspot-Studio/Urho3D-Haskell.git
+    commit: e375defd33af6486f3afe04a9365a49ea34fd4f4
+  extra-dep: true
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
@@ -49,6 +57,12 @@ flags: {}
 
 # Extra package databases containing global packages
 extra-package-dbs: []
+
+extra-lib-dirs:
+- /usr/lib64/Urho3D
+extra-include-dirs:
+- /usr/include
+- /usr/include/Urho3D/ThirdParty
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true
