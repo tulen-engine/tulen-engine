@@ -15,8 +15,11 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib
-  build-depends:       base >= 4.7 && < 5
+  exposed-modules:
+    Game.Tulen.Core
+  build-depends:
+      base             >= 4.7     && < 5
+    , tulen-api        >= 0.1     && < 0.2
   default-language:    Haskell2010
 
 source-repository head
