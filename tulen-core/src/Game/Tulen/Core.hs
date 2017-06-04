@@ -104,7 +104,7 @@ createScene app = do
   _ :: Ptr Octree <- guardJust "Failed to create Octree" =<< nodeCreateComponent scene Nothing Nothing
 
   -- Create a Zone component for ambient lighting & fog control
-  zoneNode <- nodeCreateChild scene "Zone" CM'Replicated 0
+  zoneNode <- nodeCreateChild scene "Zone" CM'Local 0
   zone :: Ptr Zone <- guardJust "Failed to create Zone" =<< nodeCreateComponent zoneNode Nothing Nothing
   -- Set same volume as the Octree, set a close bluish fog and some ambient light
   zoneSetBoundingBox zone $ BoundingBox (-1000) 1000
@@ -113,7 +113,7 @@ createScene app = do
   zoneSetFogEnd zone 300
 
   -- Create a directional light
-  lightNode <- nodeCreateChild scene "DirectionalLight" CM'Replicated 0
+  lightNode <- nodeCreateChild scene "DirectionalLight" CM'Local 0
   nodeSetDirection lightNode (Vector3 (-0.6) (-1.0) (-0.8)) -- The direction vector does not need to be normalized
   light :: Ptr Light <- guardJust "Failed to create Light" =<< nodeCreateComponent lightNode Nothing Nothing
   lightSetLightType light LT'Directional
@@ -122,7 +122,7 @@ createScene app = do
 
   -- Create the camera. Let the starting position be at the world origin. As the fog limits maximum visible distance, we can
   -- bring the far clip plane closer for more effective culling of distant objects
-  cameraNode <- nodeCreateChild scene "Camera" CM'Replicated 0
+  cameraNode <- nodeCreateChild scene "Camera" CM'Local 0
   nodeSetPosition cameraNode (Vector3 0 2 (-20))
   cam :: Ptr Camera <- guardJust "Failed to create Camera" =<< nodeCreateComponent cameraNode Nothing Nothing
   cameraSetFarClip cam 300
