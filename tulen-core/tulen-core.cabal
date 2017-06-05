@@ -19,6 +19,7 @@ library
     Game.Tulen.Core
     Game.Tulen.Internal.Core
     Game.Tulen.Internal.Landscape
+    Game.Tulen.Internal.Landscape.Types
   build-depends:
       base             >= 4.7     && < 5
     , containers       >= 0.5     && < 0.6
