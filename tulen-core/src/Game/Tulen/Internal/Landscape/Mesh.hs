@@ -1,6 +1,7 @@
 -- | Mesh generation for landscape
 module Game.Tulen.Internal.Landscape.Mesh where
 
+import Control.Lens ((^.))
 import Data.Word
 import Foreign
 import Game.Tulen.Internal.Landscape.Types
@@ -10,6 +11,8 @@ import Linear
 import qualified Data.Array.Repa as R
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
+
+import Debug.Trace
 
 -- | Holds all data for landscape mesh. Should be regenerated (or updated)
 -- when original data chanes.
@@ -26,6 +29,7 @@ data LandMesh = LandMesh {
 
 -- | Strict pair for vertex and normal
 data VertWithNorm = VertWithNorm !(V3 Float) !(V3 Float)
+  deriving (Show)
 
 -- | TODO: ensure that alignment is honored
 instance Storable VertWithNorm where
@@ -76,8 +80,9 @@ genHeightVertecies :: V2 Int -- ^ Size in tiles
 genHeightVertecies (V2 sx sy) tsize vsize hm = SV.fromList points
   where
     -- convert to model space from tile integral coords
-    toModel :: Int -> Float
-    toModel v = fromIntegral v * tsize
+    toModel :: Int -> Int -> (Float, Float)
+    toModel x y = ( fromIntegral x * tsize
+                  , fromIntegral y * tsize )
 
     -- convert to heighmap pixel space from tile space coords
     toHeightmap :: Float -> Float -> (Float, Float)
@@ -116,37 +121,55 @@ genHeightVertecies (V2 sx sy) tsize vsize hm = SV.fromList points
     getNormal :: Float -> Float -> V3 Float
     getNormal xt yt = normalize n
       where
-      R.Z R.:. yhs R.:. xhs = R.extent hm
       -- Current point
       (x, y) = toHeightmap xt yt
       z = getHeightHM x y
-      p = V3 x y z
+      p = V3 x z y
       -- First point for cross product
       x1 = x
-      y1 = if floor y == yhs-1 then y-1 else y+1
+      y1 = y+1 --if floor y == yhs-1 then y-1 else y+1
       z1 = getHeightHM x1 y1
-      p1 = V3 x1 y1 z1
+      p1 = V3 x1 z1 y1
       -- Second point for cross product
-      x2 = if floor x == xhs-1 then x-1 else x+1
+      x2 = x+1 --if floor x == xhs-1 then x-1 else x+1
       y2 = y
       z2 = getHeightHM x2 y2
-      p2 = V3 x2 y2 z2
+      p2 = V3 x2 z2 y2
       -- Vectors for cross product
       v1 = p1 - p
       v2 = p2 - p
       -- Cross product for normal
       n = v1 `cross` v2
 
+    -- | Generate tiles numbers for generation of vertecies
+    indecies :: [(Int, Int)]
+    indecies = (,) <$> [0 .. sy] <*> [0 .. sx]
+
     -- List comprehension of vertecies with normals
     points :: [VertWithNorm]
-    points = [ let
+    points = flip fmap indecies $ \(y, x) -> let
       x' = fromIntegral x
       y' = fromIntegral y
-      vert = V3 (toModel x) (toModel y) (getHeight x' y')
+      (vx, vy) = toModel x y
+      vert = V3 vx (getHeight x' y') vy
       norm = getNormal x' y'
       in VertWithNorm vert norm
-      | x <- [0 .. sx] -- +1 point at end
-      , y <- [0 .. sy] ]
+
+-- | Helper that calculates bounding box of generated mesh.
+--
+-- Warning: expoits the fact that x and y coordinates are ascending.
+calcBoundingBox :: SV.Vector VertWithNorm -> BoundingBox
+calcBoundingBox vs = if SV.null vs then BoundingBox 0 0
+  else BoundingBox (Vector3 minx minh miny) (Vector3 maxx maxh maxy)
+  where
+    inf = 1 / 0
+    (minh, maxh) = SV.foldl' accMaxH (negate inf, inf) vs
+    accMaxH (!minv, !maxv) (VertWithNorm (V3 _ h _) _) = let
+      minv' = if minv < h then h else minv
+      maxv' = if maxv > h then h else maxv
+      in (minv', maxv')
+    VertWithNorm (V3 maxx _ maxy) _ = SV.last vs
+    VertWithNorm (V3 minx _ miny) _ = SV.head vs
 
 -- | Generate triangle indecies for vertecies generated with 'genHeightVertecies'
 genTriangleIndecies :: V2 Int -- ^ Size in tiles
@@ -158,21 +181,23 @@ genTriangleIndecies (V2 sx sy) tsize vsize hm = SV.fromList points
   where
     -- Convert tile coordinate to linear index
     toIndex :: Word16 -> Word16 -> Word16
-    toIndex xi yi = xi + fromIntegral sx * yi
+    toIndex xi yi = xi + (fromIntegral sx + 1) * yi
+
+    -- | Generate tiles numbers for generation of vertecies
+    indecies :: [(Word16, Word16)]
+    indecies = (,) <$> [0 .. fromIntegral sy - 1] <*> [0 .. fromIntegral sx - 1]
 
     points :: [Word16]
-    points = concat [ let
+    points = concat . flip fmap indecies $ \(y, x) -> let
       -- first triangle (counter clockwise order)
       i1 = toIndex x y
-      i2 = toIndex (x+1) y
-      i3 = toIndex (x+1) (y+1)
+      i2 = toIndex x (y+1)
+      i3 = toIndex (x+1) y
       -- second triangle
-      i4 = toIndex x y
+      i4 = toIndex x (y+1)
       i5 = toIndex (x+1) (y+1)
-      i6 = toIndex x (y+1)
+      i6 = toIndex (x+1) y
       in [i1, i2, i3, i4, i5, i6]
-      | x <- [0 .. fromIntegral sx - 1]
-      , y <- [0 .. fromIntegral sy - 1] ]
 
 -- | Generate new land mesh from given chunk description
 makeLandMesh :: Ptr Context -- ^ Urho context
@@ -185,6 +210,7 @@ makeLandMesh context chunkSize tsize vscale ch@LandChunk{..} = do
   let vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize vscale landChunkHeightmap
       numVertices = fromIntegral $ SV.length vertNorms
       indexData :: SV.Vector Word16 = genTriangleIndecies chunkSize tsize vscale landChunkHeightmap
+      numIndecies = fromIntegral $ SV.length indexData
 
   model :: SharedPtr Model <- newSharedObject $ pointer context
   vb :: SharedPtr VertexBuffer <- newSharedObject $ pointer context
@@ -200,16 +226,17 @@ makeLandMesh context chunkSize tsize vscale ch@LandChunk{..} = do
   _ <- SV.unsafeWith vertNorms $ vertexBufferSetData vb . castPtr
 
   indexBufferSetShadowed ib True
-  indexBufferSetSize ib numVertices False False
+  indexBufferSetSize ib numIndecies False False
   _ <- SV.unsafeWith indexData $ indexBufferSetData ib . castPtr
 
   geometrySetVertexBuffer geom 0 (pointer vb)
   geometrySetIndexBuffer geom (pointer ib)
-  geometrySetDrawRange geom TriangleList 0 numVertices True
+  geometrySetDrawRange geom TriangleList 0 numIndecies True
 
   _ <- modelSetNumGeometries model 1
   _ <- modelSetGeometry model 0 0 (pointer geom)
-  modelSetBoundingBox model $ BoundingBox (Vector3 (-0.5) (-0.5) (-0.5)) (Vector3 0.5 0.5 0.5)
+  traceShowM $ calcBoundingBox vertNorms
+  modelSetBoundingBox model $ calcBoundingBox vertNorms
 
   -- Though not necessary to render, the vertex & index buffers must be listed in the model so that it can be saved properly
   let vertexBuffers = [vb]

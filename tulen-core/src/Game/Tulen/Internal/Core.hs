@@ -134,9 +134,9 @@ createScene app = do
 
   --------
   -- DEBUG
-  let chsize = 10
+  let chsize = 100
       chunk = emptyLandChunk chsize 0 10
-  landMesh <- makeLandMesh context chsize 0.1 1 chunk
+  landMesh <- makeLandMesh context chsize 1 1 chunk
   let model = landMeshModel landMesh
   node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
   nodeSetPosition node $ Vector3 0 0 0

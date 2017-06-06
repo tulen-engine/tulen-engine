@@ -33,6 +33,7 @@ library
     , vector           >= 0.11    && < 0.12
   default-language:    Haskell2010
   default-extensions:
+    BangPatterns
     OverloadedLists
     OverloadedStrings
     RecordWildCards
