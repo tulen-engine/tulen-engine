@@ -10,6 +10,8 @@ import Graphics.Urho3D
 
 -- DEBUG
 import Game.Tulen.Internal.Landscape
+import qualified Data.Array.Repa as R
+import Debug.Trace
 -- end DEBUG
 
 -- | Main context of engine. Here goes all referencies to internal resources.
@@ -135,8 +137,15 @@ createScene app = do
   --------
   -- DEBUG
   let chsize = 10
-      chunk = emptyLandChunk chsize 0 10
-  landMesh <- makeLandMesh context chsize 1 10 10 chunk
+      res = 10
+      chunk0 = emptyLandChunk chsize 0 res 1000
+      initHeights arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) -> let
+        x' = 0.005 * fromIntegral x
+        y' = 0.005 * fromIntegral y
+        d = x'^2 + y'^2
+        in floor $ fromIntegral (maxBound :: Word32) * 0.001 * (1 + sin d)
+      chunk = chunk0 { landChunkHeightmap = initHeights $ landChunkHeightmap chunk0 }
+  landMesh <- makeLandMesh context chsize 1 res 1000 chunk
   let model = landMeshModel landMesh
   node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
   nodeSetPosition node $ Vector3 0 0 0

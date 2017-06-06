@@ -72,14 +72,18 @@ data BlendInfo = BlendInfo {
 }
 
 -- | Get empty land chunk (simple plain with no tiles)
-emptyLandChunk :: V2 Int -- ^ Size in tiles
-  -> V2 Int -- ^ Offset in landscape
+emptyLandChunk ::
+     V2 Int -- ^ Size in tiles
+  -- | Offset in landscape
+  -> V2 Int
   -- | Number of vertecies per side of tile for heightmap to generate.
   -> Int
+  -- | Resolution of heightmap
+  -> V2 Int
   -> LandChunk
-emptyLandChunk (V2 xs ys) pos res = LandChunk {
+emptyLandChunk (V2 xs ys) pos res (V2 hxs hys) = LandChunk {
     landChunkPos        = pos
-  , landChunkHeightmap  = emptyArr 0
+  , landChunkHeightmap  = hmap
   , landChunkResolution = res
   , landChunkCliffs     = emptyArr 0
   , landChunkWater      = emptyArr False
@@ -88,4 +92,5 @@ emptyLandChunk (V2 xs ys) pos res = LandChunk {
   , landChunkBlending   = mempty
   }
   where
+    hmap = R.computeS $ R.fromFunction (Z :. hys :. hxs) (const 0)
     emptyArr v = R.computeS $ R.fromFunction (Z :. ys :. xs) (const v)
