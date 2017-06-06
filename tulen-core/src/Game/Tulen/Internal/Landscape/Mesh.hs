@@ -74,15 +74,15 @@ biflerp x y x1 x2 y1 y2 p11 p12 p21 p22 = flerp y y1 y2 fxy1 fxy2
 -- | Generate vertex-normal array for landscape chunk based on heightmap
 genHeightVertecies :: V2 Int -- ^ Size in tiles
   -> Float -- ^ Size of one tile
+  -> Int -- ^ Resolution (number of vertecies by tile)
   -> Float -- ^ Vertical scale of heightmap
   -> Heightmap -- ^ Heightmap of chunk
   -> SV.Vector VertWithNorm
-genHeightVertecies (V2 sx sy) tsize vsize hm = SV.fromList points
+genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
   where
     -- convert to model space from tile integral coords
-    toModel :: Int -> Int -> (Float, Float)
-    toModel x y = ( fromIntegral x * tsize
-                  , fromIntegral y * tsize )
+    toModel :: Float -> Float -> (Float, Float)
+    toModel x y = ( x * tsize, y * tsize )
 
     -- convert to heighmap pixel space from tile space coords
     toHeightmap :: Float -> Float -> (Float, Float)
@@ -142,17 +142,18 @@ genHeightVertecies (V2 sx sy) tsize vsize hm = SV.fromList points
       n = v1 `cross` v2
 
     -- | Generate tiles numbers for generation of vertecies
-    indecies :: [(Int, Int)]
-    indecies = (,) <$> [0 .. sy] <*> [0 .. sx]
+    indecies :: [(Float, Float)]
+    indecies = fmap divideByRes $ (,) <$> [0 .. sy * res] <*> [0 .. sx * res]
+      where
+        divideByRes (x, y) = (fromIntegral x / res', fromIntegral y / res')
+        res' = fromIntegral res
 
     -- List comprehension of vertecies with normals
     points :: [VertWithNorm]
     points = flip fmap indecies $ \(y, x) -> let
-      x' = fromIntegral x
-      y' = fromIntegral y
       (vx, vy) = toModel x y
-      vert = V3 vx (getHeight x' y') vy
-      norm = getNormal x' y'
+      vert = V3 vx (getHeight x y) vy
+      norm = getNormal x y
       in VertWithNorm vert norm
 
 -- | Helper that calculates bounding box of generated mesh.
@@ -174,18 +175,19 @@ calcBoundingBox vs = if SV.null vs then BoundingBox 0 0
 -- | Generate triangle indecies for vertecies generated with 'genHeightVertecies'
 genTriangleIndecies :: V2 Int -- ^ Size in tiles
   -> Float -- ^ Size of one tile
+  -> Int -- ^ Resolution (number of vertecies by tile)
   -> Float -- ^ Vertical scale of heightmap
   -> Heightmap -- ^ Heightmap of chunk
   -> SV.Vector Word16
-genTriangleIndecies (V2 sx sy) tsize vsize hm = SV.fromList points
+genTriangleIndecies (V2 sx sy) tsize res vsize hm = SV.fromList points
   where
     -- Convert tile coordinate to linear index
     toIndex :: Word16 -> Word16 -> Word16
-    toIndex xi yi = xi + (fromIntegral sx + 1) * yi
+    toIndex xi yi = xi + (fromIntegral (sx * res) + 1) * yi
 
     -- | Generate tiles numbers for generation of vertecies
     indecies :: [(Word16, Word16)]
-    indecies = (,) <$> [0 .. fromIntegral sy - 1] <*> [0 .. fromIntegral sx - 1]
+    indecies = (,) <$> [0 .. fromIntegral (sy * res) - 1] <*> [0 .. fromIntegral (sx * res) - 1]
 
     points :: [Word16]
     points = concat . flip fmap indecies $ \(y, x) -> let
@@ -203,13 +205,14 @@ genTriangleIndecies (V2 sx sy) tsize vsize hm = SV.fromList points
 makeLandMesh :: Ptr Context -- ^ Urho context
   -> V2 Int -- ^ Size in tiles of chunk
   -> Float -- ^ Size of single tile
+  -> Int -- ^ Resolution (count of vertecies per tile)
   -> Float -- ^ Vertical scale of heightmap
   -> LandChunk -- ^ chunk
   -> IO LandMesh
-makeLandMesh context chunkSize tsize vscale ch@LandChunk{..} = do
-  let vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize vscale landChunkHeightmap
+makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
+  let vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize res vscale landChunkHeightmap
       numVertices = fromIntegral $ SV.length vertNorms
-      indexData :: SV.Vector Word16 = genTriangleIndecies chunkSize tsize vscale landChunkHeightmap
+      indexData :: SV.Vector Word16 = genTriangleIndecies chunkSize tsize res vscale landChunkHeightmap
       numIndecies = fromIntegral $ SV.length indexData
 
   model :: SharedPtr Model <- newSharedObject $ pointer context
@@ -235,7 +238,6 @@ makeLandMesh context chunkSize tsize vscale ch@LandChunk{..} = do
 
   _ <- modelSetNumGeometries model 1
   _ <- modelSetGeometry model 0 0 (pointer geom)
-  traceShowM $ calcBoundingBox vertNorms
   modelSetBoundingBox model $ calcBoundingBox vertNorms
 
   -- Though not necessary to render, the vertex & index buffers must be listed in the model so that it can be saved properly

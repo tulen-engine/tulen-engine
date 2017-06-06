@@ -45,7 +45,7 @@ data LandChunk = LandChunk {
   landChunkPos        :: !(V2 Int)
   -- | Heightmap that defines height of each point in landscape piece.
 , landChunkHeightmap  :: !Heightmap
-  -- | Number of vertecies per side of heightmap to generate.
+  -- | Number of vertecies per side of a tile of heightmap to generate.
 , landChunkResolution :: !Int
   -- | Info about cliffs
 , landChunkCliffs     :: !Cliffmap
@@ -74,7 +74,7 @@ data BlendInfo = BlendInfo {
 -- | Get empty land chunk (simple plain with no tiles)
 emptyLandChunk :: V2 Int -- ^ Size in tiles
   -> V2 Int -- ^ Offset in landscape
-  -- | Number of vertecies per side of heightmap to generate.
+  -- | Number of vertecies per side of tile for heightmap to generate.
   -> Int
   -> LandChunk
 emptyLandChunk (V2 xs ys) pos res = LandChunk {
