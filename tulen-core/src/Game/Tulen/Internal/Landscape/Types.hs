@@ -10,7 +10,7 @@ import Linear
 import qualified Data.Array.Repa as R
 
 -- | Heightmap is int32 two dimensional array
-type Heightmap = Array U DIM2 Word32
+type Heightmap = Array U DIM2 Float
 
 -- | Cliffmap stores cliffs levels in 2*L format and
 -- slopes as 2*L+1.

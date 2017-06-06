@@ -97,8 +97,7 @@ genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
       R.Z R.:. yhs R.:. xhs = R.extent hm
       xclamp = max 0 . min (xhs-1) . floor
       yclamp = max 0 . min (yhs-1) . floor
-      v = R.index hm (R.Z R.:. yclamp y R.:. xclamp x)
-      in fromIntegral v / fromIntegral (maxBound :: Word32)
+      in R.index hm (R.Z R.:. yclamp y R.:. xclamp x)
 
     -- Input should be in [0 .. size] range in hieghtmap pixel space
     getHeightHM :: Float -> Float -> Float

@@ -143,7 +143,7 @@ createScene app = do
         x' = 0.005 * fromIntegral x
         y' = 0.005 * fromIntegral y
         d = x'^2 + y'^2
-        in floor $ fromIntegral (maxBound :: Word32) * 0.001 * (1 + sin d)
+        in 0.001 * (1 + sin d)
       chunk = chunk0 { landChunkHeightmap = initHeights $ landChunkHeightmap chunk0 }
   landMesh <- makeLandMesh context chsize 1 res 1000 chunk
   let model = landMeshModel landMesh
