@@ -2,10 +2,15 @@
 -- | Defines main context of engine that encapsulates all resources in one reference.
 module Game.Tulen.Internal.Core where
 
+import Control.Lens ((^.))
 import Data.IORef
 import Data.StateVar
 import Foreign
 import Graphics.Urho3D
+
+-- DEBUG
+import Game.Tulen.Internal.Landscape
+-- end DEBUG
 
 -- | Main context of engine. Here goes all referencies to internal resources.
 -- Core is used as entry point for game.
@@ -76,6 +81,9 @@ coreStart :: IORef Core -> IO ()
 coreStart coreRef = do
   core <- readIORef coreRef
   (scene, camera) <- createScene $ coreApplication core
+  let app = coreApplication core
+  setupViewport app scene camera
+  subscribeToEvents app camera
   initMouseMode core MM'Relative
   atomicWriteIORef coreRef $ core {
       coreScene  = scene
@@ -91,8 +99,9 @@ coreStop Core{..} = do
 -- | Construct the scene content.
 createScene :: SharedPtr Application -> IO (SharedPtr Scene, Ptr Node)
 createScene app = do
+  context :: Ptr Context <- getContext app
   cache :: Ptr ResourceCache <- guardJust "Missing subsystem ResourceCache" =<< getSubsystem app
-  scene :: SharedPtr Scene <- newSharedObject =<< getContext app
+  scene :: SharedPtr Scene <- newSharedObject context
 
   {-
     Create octree, use default volume (-1000, -1000, -1000) to (1000, 1000, 1000)
@@ -123,7 +132,114 @@ createScene app = do
   cam :: Ptr Camera <- guardJust "Failed to create Camera" =<< nodeCreateComponent cameraNode Nothing Nothing
   cameraSetFarClip cam 300
 
+  --------
+  -- DEBUG
+  let chsize = 10
+      chunk = emptyLandChunk chsize 0 10
+  landMesh <- makeLandMesh context chsize 0.1 1 chunk
+  let model = landMeshModel landMesh
+  node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
+  nodeSetPosition node $ Vector3 0 0 0
+  object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
+  staticModelSetModel object model
+  -- END DEBUG
+  --------
+
   return (scene, cameraNode)
+
+-- | Set up a viewport for displaying the scene.
+setupViewport :: SharedPtr Application -> SharedPtr Scene -> Ptr Node -> IO ()
+setupViewport app scene cameraNode = do
+  (renderer :: Ptr Renderer) <- guardJust "Renderer" =<< getSubsystem app
+
+  {-
+    Set up a viewport to the Renderer subsystem so that the 3D scene can be seen. We need to define the scene and the camera
+    at minimum. Additionally we could configure the viewport screen size and the rendering path (eg. forward / deferred) to
+    use, but now we just use full screen and default render path configured in the engine command line options
+  -}
+  cntx <- getContext app
+  (cam :: Ptr Camera) <- guardJust "Camera" =<< nodeGetComponent cameraNode False
+  (viewport :: SharedPtr Viewport) <- newSharedObject (cntx, pointer scene, cam)
+  rendererSetViewport renderer 0 viewport
+
+data CameraData = CameraData {
+  camYaw :: Float
+, camPitch :: Float
+, camDebugGeometry :: Bool
+}
+
+-- | Read input and moves the camera.
+moveCamera :: SharedPtr Application -> Ptr Node -> Float -> CameraData -> IO CameraData
+moveCamera app cameraNode t camData = do
+  (ui :: Ptr UI) <- guardJust "UI" =<< getSubsystem app
+
+  -- Do not move if the UI has a focused element (the console)
+  mFocusElem <- uiFocusElement ui
+  whenNothing mFocusElem camData $ do
+    (input :: Ptr Input) <- guardJust "Input" =<< getSubsystem app
+
+    -- Movement speed as world units per second
+    let moveSpeed = 20
+    -- Mouse sensitivity as degrees per pixel
+    let mouseSensitivity = 0.1
+
+    -- Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
+    mouseMove <- inputGetMouseMove input
+    let yaw = camYaw camData + mouseSensitivity * fromIntegral (mouseMove ^. x)
+    let pitch = clamp (-90) 90 $ camPitch camData + mouseSensitivity * fromIntegral (mouseMove ^. y)
+
+    -- Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
+    nodeSetRotation cameraNode $ quaternionFromEuler pitch yaw 0
+
+    -- Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
+    -- Use the Translate() function (default local space) to move relative to the node's orientation.
+    whenM (inputGetKeyDown input KeyW) $
+      nodeTranslate cameraNode (vec3Forward `mul` (moveSpeed * t)) TS'Local
+    whenM (inputGetKeyDown input KeyS) $
+      nodeTranslate cameraNode (vec3Back `mul` (moveSpeed * t)) TS'Local
+    whenM (inputGetKeyDown input KeyA) $
+      nodeTranslate cameraNode (vec3Left `mul` (moveSpeed * t)) TS'Local
+    whenM (inputGetKeyDown input KeyD) $
+      nodeTranslate cameraNode (vec3Right `mul` (moveSpeed * t)) TS'Local
+
+    -- Toggle debug geometry with space
+    spacePressed <- inputGetKeyPress input KeySpace
+
+    return camData {
+        camYaw = yaw
+      , camPitch = pitch
+      , camDebugGeometry = (if spacePressed then not else id) $ camDebugGeometry camData
+      }
+  where
+    mul (Vector3 a b c) v = Vector3 (a*v) (b*v) (c*v)
+
+-- | Subscribe to application-wide logic update events.
+subscribeToEvents :: SharedPtr Application -> Ptr Node -> IO ()
+subscribeToEvents app cameraNode = do
+  camDataRef <- newIORef $ CameraData 0 0 False
+  timeRef <- newIORef 0
+  subscribeToEvent app $ handleUpdate app cameraNode camDataRef timeRef
+  subscribeToEvent app $ handlePostRenderUpdate app camDataRef
+
+-- | Handle the logic update event.
+handleUpdate :: SharedPtr Application -> Ptr Node -> IORef CameraData -> IORef Float -> EventUpdate -> IO ()
+handleUpdate app cameraNode camDataRef timeRef e = do
+  -- Take the frame time step, which is stored as a float
+  let t = e ^. timeStep
+  camData <- readIORef camDataRef
+  -- Move the camera, scale movement with time step
+  writeIORef camDataRef =<< moveCamera app cameraNode t camData
+
+handlePostRenderUpdate :: SharedPtr Application -> IORef CameraData -> EventPostRenderUpdate -> IO ()
+handlePostRenderUpdate app camDataRef _ = do
+  camData <- readIORef camDataRef
+  (renderer :: Ptr Renderer) <- guardJust "Renderer" =<< getSubsystem app
+
+  -- If draw debug mode is enabled, draw viewport debug geometry, which will show eg. drawable bounding boxes and skeleton
+  -- bones. Note that debug geometry has to be separately requested each frame. This time use depth test, as otherwise the result becomes
+  -- hard to interpret due to large object count
+  when (camDebugGeometry camData) $
+    rendererDrawDebugGeometry renderer True
 
 -- | Change mouse visibility and behavior
 initMouseMode :: Core -> MouseMode -> IO ()
@@ -137,3 +253,11 @@ initMouseMode core mode = do
 guardJust :: String -> Maybe a -> IO a
 guardJust msg Nothing = fail $ "Unrecoverable error! " ++ msg
 guardJust _ (Just a) = pure a
+
+-- | Helper to run code when value is nothing
+whenNothing :: Monad m => Maybe a -> b -> m b -> m b
+whenNothing Nothing _ f = f
+whenNothing (Just _) a _ = return a
+
+clamp :: Ord a => a -> a -> a -> a
+clamp mina maxa = max mina . min maxa

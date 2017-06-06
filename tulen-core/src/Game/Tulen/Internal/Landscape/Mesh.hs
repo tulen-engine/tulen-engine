@@ -90,8 +90,8 @@ genHeightVertecies (V2 sx sy) tsize vsize hm = SV.fromList points
     getHVal :: Float -> Float -> Float
     getHVal x y = let
       R.Z R.:. yhs R.:. xhs = R.extent hm
-      xclamp = max 0 . min xhs . floor
-      yclamp = max 0 . min yhs . floor
+      xclamp = max 0 . min (xhs-1) . floor
+      yclamp = max 0 . min (yhs-1) . floor
       v = R.index hm (R.Z R.:. yclamp y R.:. xclamp x)
       in fromIntegral v / fromIntegral (maxBound :: Word32)
 

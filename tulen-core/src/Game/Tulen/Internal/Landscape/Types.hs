@@ -1,10 +1,13 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module Game.Tulen.Internal.Landscape.Types where
 
-import Data.Array.Repa
+import Data.Array.Repa (Array, U, DIM2, Z(..), (:.)(..))
 import Data.Map (Map)
 import Data.Vector (Vector)
 import Data.Word
 import Linear
+
+import qualified Data.Array.Repa as R
 
 -- | Heightmap is int32 two dimensional array
 type Heightmap = Array U DIM2 Word32
@@ -67,3 +70,22 @@ data BlendInfo = BlendInfo {
   -- | Refernce to blend texture (TODO)
   blendResource :: !String
 }
+
+-- | Get empty land chunk (simple plain with no tiles)
+emptyLandChunk :: V2 Int -- ^ Size in tiles
+  -> V2 Int -- ^ Offset in landscape
+  -- | Number of vertecies per side of heightmap to generate.
+  -> Int
+  -> LandChunk
+emptyLandChunk (V2 xs ys) pos res = LandChunk {
+    landChunkPos        = pos
+  , landChunkHeightmap  = emptyArr 0
+  , landChunkResolution = res
+  , landChunkCliffs     = emptyArr 0
+  , landChunkWater      = emptyArr False
+  , landChunkTiles      = emptyArr 0
+  , landChunkTilesVar   = emptyArr 0
+  , landChunkBlending   = mempty
+  }
+  where
+    emptyArr v = R.computeS $ R.fromFunction (Z :. ys :. xs) (const v)
