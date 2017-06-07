@@ -142,18 +142,26 @@ genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
 
     -- | Generate tiles numbers for generation of vertecies
     indecies :: [(Float, Float)]
-    indecies = fmap divideByRes $ (,) <$> [0 .. sy * res] <*> [0 .. sx * res]
+    indecies = fmap divideByRes $ (,) <$> [0 .. sy * res - 1] <*> [0 .. sx * res - 1]
       where
         divideByRes (x, y) = (fromIntegral x / res', fromIntegral y / res')
         res' = fromIntegral res
 
     -- List comprehension of vertecies with normals
     points :: [VertWithNorm]
-    points = flip fmap indecies $ \(y, x) -> let
-      (vx, vy) = toModel x y
-      vert = V3 vx (getHeight x y) vy
-      norm = getNormal x y
-      in VertWithNorm vert norm
+    points = concat $ flip fmap indecies $ \(y, x) -> [
+        mkVertNorm  x        y
+      , mkVertNorm (x + dv)  y
+      , mkVertNorm  x       (y + dv)
+      , mkVertNorm (x + dv) (y + dv)
+      ]
+      where
+      dv = 1 / fromIntegral res
+      mkVertNorm x y = let
+        (vx, vy) = toModel x y
+        vert = V3 vx (getHeight x y) vy
+        norm = getNormal x y
+        in VertWithNorm vert norm
 
 -- | Helper that calculates bounding box of generated mesh.
 --
@@ -181,23 +189,23 @@ genTriangleIndecies :: V2 Int -- ^ Size in tiles
 genTriangleIndecies (V2 sx sy) tsize res vsize hm = SV.fromList points
   where
     -- Convert tile coordinate to linear index
-    toIndex :: Word16 -> Word16 -> Word16
-    toIndex xi yi = xi + (fromIntegral (sx * res) + 1) * yi
+    -- toIndex :: Word16 -> Word16 -> Word16
+    -- toIndex xi yi = xi * fromIntegral res * 4 + fromIntegral (sx * res * 4) * yi
 
     -- | Generate tiles numbers for generation of vertecies
-    indecies :: [(Word16, Word16)]
-    indecies = (,) <$> [0 .. fromIntegral (sy * res) - 1] <*> [0 .. fromIntegral (sx * res) - 1]
+    indecies :: [Word16]
+    indecies = [0 .. fromIntegral (sy * sx * res * res) - 1]
 
     points :: [Word16]
-    points = concat . flip fmap indecies $ \(y, x) -> let
+    points = concat . flip fmap indecies $ \i -> let
       -- first triangle (counter clockwise order)
-      i1 = toIndex x y
-      i2 = toIndex x (y+1)
-      i3 = toIndex (x+1) y
+      i1 = i*4
+      i2 = i1 + 2
+      i3 = i1 + 3
       -- second triangle
-      i4 = toIndex x (y+1)
-      i5 = toIndex (x+1) (y+1)
-      i6 = toIndex (x+1) y
+      i4 = i1
+      i5 = i1 + 3
+      i6 = i1 + 1
       in [i1, i2, i3, i4, i5, i6]
 
 -- | Generate new land mesh from given chunk description
