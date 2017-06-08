@@ -45,7 +45,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/Teaspot-Studio/Urho3D-Haskell.git
-    commit: 8910d0b9cd5c6bf6fe8e73afda4feedf247488dc
+    commit: df0a5a65da5de0a1fddac6ff1b50c6fa801a18b8
   subdirs:
     - '.'
     - 'urho3d-bindgen'

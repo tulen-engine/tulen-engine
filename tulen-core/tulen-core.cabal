@@ -12,6 +12,11 @@ category:            Web
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
+data-files:
+  Data/Materials/*.xml
+  Data/Shaders/GLSL/*.glsl
+  Data/Shaders/HLSL/*.hlsl
+  Data/Techniques/*.xml
 
 library
   hs-source-dirs:      src
@@ -21,9 +26,12 @@ library
     Game.Tulen.Internal.Landscape
     Game.Tulen.Internal.Landscape.Mesh
     Game.Tulen.Internal.Landscape.Types
+  other-modules:
+    Paths_tulen_core
   build-depends:
       base             >= 4.7     && < 5
     , containers       >= 0.5     && < 0.6
+    , directory        >= 1.3     && < 1.4
     , lens             >= 4.15    && < 4.16
     , linear           >= 1.20    && < 1.21
     , repa             >= 3.4     && < 3.5

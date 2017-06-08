@@ -7,6 +7,8 @@ import Data.IORef
 import Data.StateVar
 import Foreign
 import Graphics.Urho3D
+import Paths_tulen_core
+import System.Directory
 
 -- DEBUG
 import Game.Tulen.Internal.Landscape
@@ -20,6 +22,7 @@ data Core = Core {
   coreApplication :: SharedPtr Application
 , coreScene       :: SharedPtr Scene
 , coreCamera      :: Ptr Node
+, coreConfig      :: CoreConfig
 }
 
 -- | Additional runtime configuration of engine core.
@@ -28,12 +31,14 @@ data CoreConfig = CoreConfig {
   coreWindowTitle :: String
   -- | Log file name relative to current folder. Nothing means no log.
 , coreLogFile     :: Maybe String
+  -- | Path to resource folder. For Nothing, try to guess.
+, coreResources   :: Maybe FilePath
   -- | User can provide additional action for engine setup stage.
 , coreCustomSetup :: Maybe (Core -> IO ())
   -- | User can provide additional action for engine startup stage.
 , coreCustomStart :: Maybe (Core -> IO ())
 -- | User can provide additional action for engine stop stage.
-, coreCustomStop :: Maybe (Core -> IO ())
+, coreCustomStop  :: Maybe (Core -> IO ())
 }
 
 -- | Neutral configuration that doesn't affect behavior of engine
@@ -41,6 +46,7 @@ defaultCoreConfig :: CoreConfig
 defaultCoreConfig = CoreConfig {
     coreWindowTitle = "Tulen engine"
   , coreLogFile = Nothing
+  , coreResources = Nothing
   , coreCustomSetup = Nothing
   , coreCustomStart = Nothing
   , coreCustomStop = Nothing
@@ -60,8 +66,17 @@ runCore cfg@CoreConfig{..} = withObject () $ \context -> do
         coreApplication = app
       , coreScene = undefined -- initialized at coreStart
       , coreCamera = undefined
+      , coreConfig = cfg
       }
   applicationRun app
+
+-- | Try to guess resource dir with core assets
+getResourceDir :: Maybe FilePath -> IO FilePath
+getResourceDir (Just p) = pure p
+getResourceDir Nothing = do
+  p <- getDataFileName "Data"
+  exists <- doesDirectoryExist p
+  pure $ if not exists then "./Data" else p
 
 -- | Internal core setup steps
 coreSetup :: CoreConfig -> Core -> IO ()
@@ -82,8 +97,9 @@ coreSetup CoreConfig{..} core = do
 coreStart :: IORef Core -> IO ()
 coreStart coreRef = do
   core <- readIORef coreRef
-  (scene, camera) <- createScene $ coreApplication core
   let app = coreApplication core
+  initResources (coreConfig core) app
+  (scene, camera) <- createScene $ coreApplication core
   setupViewport app scene camera
   subscribeToEvents app camera
   initMouseMode core MM'Relative
@@ -91,6 +107,13 @@ coreStart coreRef = do
       coreScene  = scene
     , coreCamera = camera
     }
+
+initResources :: CoreConfig -> SharedPtr Application -> IO ()
+initResources CoreConfig{..} app = do
+  path <- getResourceDir coreResources
+  cache :: Ptr ResourceCache <- guardJust "ResourceCache" =<< getSubsystem app
+  _ <- cacheAddResourceDir cache path priorityLast
+  pure ()
 
 -- | Internal core stop steps
 coreStop :: Core -> IO ()
@@ -115,35 +138,39 @@ createScene app = do
   zone :: Ptr Zone <- guardJust "Failed to create Zone" =<< nodeCreateComponent zoneNode Nothing Nothing
   -- Set same volume as the Octree, set a close bluish fog and some ambient light
   zoneSetBoundingBox zone $ BoundingBox (-1000) 1000
+  zoneSetAmbientColor zone $ rgb 0.15 0.15 0.15
   zoneSetFogColor zone $ rgb 0.2 0.2 0.2
   zoneSetFogStart zone 200
   zoneSetFogEnd zone 300
 
   -- Create a directional light
   lightNode <- nodeCreateChild scene "DirectionalLight" CM'Local 0
-  nodeSetDirection lightNode (Vector3 (-0.6) (-1.0) (-0.8)) -- The direction vector does not need to be normalized
+  nodeSetDirection lightNode (Vector3 0.5 (-1.0) 0.1) -- The direction vector does not need to be normalized
   light :: Ptr Light <- guardJust "Failed to create Light" =<< nodeCreateComponent lightNode Nothing Nothing
   lightSetLightType light LT'Directional
-  lightSetColor light $ rgb 0.4 1.0 0.4
-  lightSetSpecularIntensity light 1.5
+  drawableSetCastShadows light True
+  lightSetShadowBias light $ BiasParameters 0.00025 0.5
+  -- Set cascade splits at 10, 50 and 200 world units, fade shadows out at 80% of maximum shadow distance
+  lightSetShadowCascade light $ CascadeParameters 10 50 200 0 0.8 1.0
 
   -- Create the camera. Let the starting position be at the world origin. As the fog limits maximum visible distance, we can
   -- bring the far clip plane closer for more effective culling of distant objects
   cameraNode <- nodeCreateChild scene "Camera" CM'Local 0
-  nodeSetPosition cameraNode (Vector3 0 2 (-20))
+  nodeSetPosition cameraNode (Vector3 2 2 2)
+  nodeLookAtSimple cameraNode (Vector3 0 0 10) -- why it is ignored? O_O
   cam :: Ptr Camera <- guardJust "Failed to create Camera" =<< nodeCreateComponent cameraNode Nothing Nothing
   cameraSetFarClip cam 300
 
   --------
   -- DEBUG
   let chsize = 10
-      res = 10
+      res = 10 -- TODO: why this fails if greater 14 ? 
       chunk0 = emptyLandChunk chsize 0 res 1000
       initHeights arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) -> let
         x' = 0.005 * fromIntegral x
         y' = 0.005 * fromIntegral y
         d = x'^2 + y'^2
-        in 0.001 * (1 + sin d)
+        in 0.00025 * (1 + sin d)
       chunk = chunk0 { landChunkHeightmap = initHeights $ landChunkHeightmap chunk0 }
   landMesh <- makeLandMesh context chsize 1 res 1000 chunk
   let model = landMeshModel landMesh
@@ -151,9 +178,9 @@ createScene app = do
   nodeSetPosition node $ Vector3 0 0 0
   object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
   staticModelSetModel object model
-  (planeMaterial :: Ptr Material) <- guardJust "StoneTiled.xml" =<< cacheGetResource cache "Materials/StoneTiled.xml" True
+  (planeMaterial :: Ptr Material) <- guardJust "StoneTiled.xml" =<< cacheGetResource cache "Materials/Debug.xml" True
   staticModelSetMaterial object planeMaterial
-
+  drawableSetCastShadows object True
   -- END DEBUG
   --------
 

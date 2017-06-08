@@ -1,0 +1,9 @@
+<material>
+    <technique name="Techniques/LandscapeBlend.xml" />
+    <texture unit="0" name="Textures/LandscapeWeights.dds" />
+    <texture unit="1" name="Textures/LandscapeDetail1.dds" />
+    <texture unit="2" name="Textures/LandscapeDetail2.dds" />
+    <texture unit="3" name="Textures/LandscapeDetail3.dds" />
+    <parameter name="MatSpecColor" value="0.5 0.5 0.5 16" />
+    <parameter name="DetailTiling" value="32 32" />
+</material>
