@@ -164,7 +164,7 @@ createScene app = do
   --------
   -- DEBUG
   let chsize = 10
-      res = 10 -- TODO: why this fails if greater 14 ? 
+      res = 30
       chunk0 = emptyLandChunk chsize 0 res 1000
       initHeights arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) -> let
         x' = 0.005 * fromIntegral x

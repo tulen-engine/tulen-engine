@@ -192,18 +192,14 @@ genTriangleIndecies :: V2 Int -- ^ Size in tiles
   -> Int -- ^ Resolution (number of vertecies by tile)
   -> Float -- ^ Vertical scale of heightmap
   -> Heightmap -- ^ Heightmap of chunk
-  -> SV.Vector Word16
+  -> SV.Vector Word32
 genTriangleIndecies (V2 sx sy) tsize res vsize hm = SV.fromList points
   where
-    -- Convert tile coordinate to linear index
-    -- toIndex :: Word16 -> Word16 -> Word16
-    -- toIndex xi yi = xi * fromIntegral res * 4 + fromIntegral (sx * res * 4) * yi
-
     -- | Generate tiles numbers for generation of vertecies
-    indecies :: [Word16]
+    indecies :: [Word32]
     indecies = [0 .. fromIntegral (sy * sx * res * res) - 1]
 
-    points :: [Word16]
+    points :: [Word32]
     points = concat . flip fmap indecies $ \i -> let
       -- first triangle (counter clockwise order)
       i1 = i*4
@@ -226,7 +222,7 @@ makeLandMesh :: Ptr Context -- ^ Urho context
 makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
   let vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize res vscale landChunkHeightmap
       numVertices = fromIntegral $ SV.length vertNorms
-      indexData :: SV.Vector Word16 = genTriangleIndecies chunkSize tsize res vscale landChunkHeightmap
+      indexData :: SV.Vector Word32 = genTriangleIndecies chunkSize tsize res vscale landChunkHeightmap
       numIndecies = fromIntegral $ SV.length indexData
 
   model :: SharedPtr Model <- newSharedObject $ pointer context
@@ -244,7 +240,7 @@ makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
   _ <- SV.unsafeWith vertNorms $ vertexBufferSetData vb . castPtr
 
   indexBufferSetShadowed ib True
-  indexBufferSetSize ib numIndecies False False
+  indexBufferSetSize ib numIndecies True False
   _ <- SV.unsafeWith indexData $ indexBufferSetData ib . castPtr
 
   geometrySetVertexBuffer geom 0 (pointer vb)
