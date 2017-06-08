@@ -27,21 +27,23 @@ data LandMesh = LandMesh {
 , landMeshGeometry :: !(SharedPtr Geometry)
 }
 
--- | Strict pair for vertex and normal
-data VertWithNorm = VertWithNorm !(V3 Float) !(V3 Float)
+-- | Strict pair for vertex and normal and UV
+data VertWithNorm = VertWithNorm !(V3 Float) !(V3 Float) !(V2 Float)
   deriving (Show)
 
 -- | TODO: ensure that alignment is honored
 instance Storable VertWithNorm where
-  sizeOf _  = 2 * sizeOf (undefined :: V3 Float)
-  alignment _ = alignment (undefined :: V3 Float)
+  sizeOf _  = 2 * sizeOf (undefined :: V3 Float) + sizeOf (undefined :: V2 Float)
+  alignment _ = 1
   peek ptr = do
     v1 <- peek . castPtr $ ptr
     v2 <- peek . castPtr $ ptr `plusPtr` sizeOf (undefined :: V3 Float)
-    pure $ VertWithNorm v1 v2
-  poke ptr (VertWithNorm v1 v2) = do
+    v3 <- peek . castPtr $ ptr `plusPtr` (2 * sizeOf (undefined :: V3 Float))
+    pure $ VertWithNorm v1 v2 v3
+  poke ptr (VertWithNorm v1 v2 v3) = do
     poke (castPtr   ptr) v1
     poke (castPtr $ ptr `plusPtr` sizeOf (undefined :: V3 Float)) v2
+    poke (castPtr $ ptr `plusPtr` (2 * sizeOf (undefined :: V3 Float))) v3
 
 -- | Linear interpolation of function with two points
 flerp :: Fractional a
@@ -149,19 +151,24 @@ genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
 
     -- List comprehension of vertecies with normals
     points :: [VertWithNorm]
-    points = concat $ flip fmap indecies $ \(y, x) -> [
-        mkVertNorm  x        y
-      , mkVertNorm (x + dv)  y
-      , mkVertNorm  x       (y + dv)
-      , mkVertNorm (x + dv) (y + dv)
-      ]
+    points = concat $ flip fmap indecies $ \(y, x) -> let
+      u0 = fromIntegral (floor x) - x
+      u1 = u0 + dv
+      t0 = fromIntegral (floor y) - y
+      t1 = t0 + dv
+      in [
+          mkVertNorm  x        y       (V2 u0 t0)
+        , mkVertNorm (x + dv)  y       (V2 u1 t0)
+        , mkVertNorm  x       (y + dv) (V2 u0 t1)
+        , mkVertNorm (x + dv) (y + dv) (V2 u1 t1)
+        ]
       where
       dv = 1 / fromIntegral res
-      mkVertNorm x y = let
+      mkVertNorm x y uv = let
         (vx, vy) = toModel x y
         vert = V3 vx (getHeight x y) vy
         norm = getNormal x y
-        in VertWithNorm vert norm
+        in VertWithNorm vert norm uv
 
 -- | Helper that calculates bounding box of generated mesh.
 --
@@ -172,12 +179,12 @@ calcBoundingBox vs = if SV.null vs then BoundingBox 0 0
   where
     inf = 1 / 0
     (minh, maxh) = SV.foldl' accMaxH (negate inf, inf) vs
-    accMaxH (!minv, !maxv) (VertWithNorm (V3 _ h _) _) = let
+    accMaxH (!minv, !maxv) (VertWithNorm (V3 _ h _) _ _) = let
       minv' = if minv < h then h else minv
       maxv' = if maxv > h then h else maxv
       in (minv', maxv')
-    VertWithNorm (V3 maxx _ maxy) _ = SV.last vs
-    VertWithNorm (V3 minx _ miny) _ = SV.head vs
+    VertWithNorm (V3 maxx _ maxy) _ _ = SV.last vs
+    VertWithNorm (V3 minx _ miny) _ _ = SV.head vs
 
 -- | Generate triangle indecies for vertecies generated with 'genHeightVertecies'
 genTriangleIndecies :: V2 Int -- ^ Size in tiles
@@ -231,7 +238,8 @@ makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
   vertexBufferSetShadowed vb True
   -- Fill vertex buffer
   let elements = [ vertexElement Type'Vector3 SEM'Position
-                 , vertexElement Type'Vector3 SEM'Normal ]
+                 , vertexElement Type'Vector3 SEM'Normal
+                 , vertexElement Type'Vector2 SEM'TexCoord ]
   vertexBufferSetSize vb numVertices elements False
   _ <- SV.unsafeWith vertNorms $ vertexBufferSetData vb . castPtr
 
