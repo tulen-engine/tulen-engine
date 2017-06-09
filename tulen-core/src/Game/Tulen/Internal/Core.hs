@@ -157,7 +157,6 @@ createScene app = do
   -- bring the far clip plane closer for more effective culling of distant objects
   cameraNode <- nodeCreateChild scene "Camera" CM'Local 0
   nodeSetPosition cameraNode (Vector3 2 2 2)
-  nodeLookAtSimple cameraNode (Vector3 0 0 10) -- why it is ignored? O_O
   cam :: Ptr Camera <- guardJust "Failed to create Camera" =<< nodeCreateComponent cameraNode Nothing Nothing
   cameraSetFarClip cam 300
 
@@ -255,7 +254,7 @@ moveCamera app cameraNode t camData = do
 -- | Subscribe to application-wide logic update events.
 subscribeToEvents :: SharedPtr Application -> Ptr Node -> IO ()
 subscribeToEvents app cameraNode = do
-  camDataRef <- newIORef $ CameraData 0 0 False
+  camDataRef <- newIORef $ CameraData 0 30 False
   timeRef <- newIORef 0
   subscribeToEvent app $ handleUpdate app cameraNode camDataRef timeRef
   subscribeToEvent app $ handlePostRenderUpdate app camDataRef
