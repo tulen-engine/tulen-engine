@@ -177,7 +177,7 @@ createScene app = do
   nodeSetPosition node $ Vector3 0 0 0
   object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
   staticModelSetModel object model
-  (planeMaterial :: Ptr Material) <- guardJust "StoneTiled.xml" =<< cacheGetResource cache "Materials/Debug.xml" True
+  (planeMaterial :: Ptr Material) <- guardJust "Landscape.xml" =<< cacheGetResource cache "Materials/Landscape.xml" True
   staticModelSetMaterial object planeMaterial
   drawableSetCastShadows object True
   -- END DEBUG

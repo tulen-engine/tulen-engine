@@ -1,0 +1,8 @@
+<texturearray>
+	<layer name="Textures/Barrens/Barrens_Dirt.png" />
+	<layer name="Textures/Barrens/Barrens_DirtRough_ext.png" />
+	<layer name="Textures/Barrens/Barrens_Grass.png" />
+	<layer name="Textures/Barrens/Barrens_DirtGrass_ext.png" />
+	<layer name="Textures/Barrens/Barrens_Pebbles_ext.png" />
+	<layer name="Textures/Barrens/Barrens_Rock_ext.png" />
+</texturearray>
