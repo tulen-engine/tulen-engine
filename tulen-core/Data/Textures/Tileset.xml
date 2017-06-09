@@ -5,4 +5,5 @@
 	<layer name="Textures/Barrens/Barrens_DirtGrass_ext.png" />
 	<layer name="Textures/Barrens/Barrens_Pebbles_ext.png" />
 	<layer name="Textures/Barrens/Barrens_Rock_ext.png" />
+	<filter mode="nearest"/>
 </texturearray>

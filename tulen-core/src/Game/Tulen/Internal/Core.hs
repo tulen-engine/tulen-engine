@@ -166,8 +166,8 @@ createScene app = do
       res = 30
       chunk0 = emptyLandChunk chsize 0 res 1000
       initHeights arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) -> let
-        x' = 0.005 * fromIntegral x
-        y' = 0.005 * fromIntegral y
+        x' = 0.003 * fromIntegral x
+        y' = 0.003 * fromIntegral y
         d = x'^2 + y'^2
         in 0.00025 * (1 + sin d)
       chunk = chunk0 { landChunkHeightmap = initHeights $ landChunkHeightmap chunk0 }

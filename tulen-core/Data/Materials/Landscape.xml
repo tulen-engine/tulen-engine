@@ -1,6 +1,8 @@
 <material>
     <technique name="Techniques/LandscapeBlend.xml" />
-    <texture unit="0" name="Textures/LandscapeWeights.dds" />
+    <texture unit="0" name="Textures/LandscapeTiles.png"/>
     <texture unit="1" name="Textures/Tileset.xml" />
-    <parameter name="MatSpecColor" value="0.5 0.5 0.5 16" />
+    <parameter name="MatSpecColor" value="0 0 0 16" />
+    <parameter name="TileResolution" value="30"/>
+    <parameter name="ChunkSize" value="10"/>
 </material>

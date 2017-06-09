@@ -17,9 +17,10 @@ data-files:
   Data/Shaders/GLSL/*.glsl
   Data/Shaders/HLSL/*.hlsl
   Data/Techniques/*.xml
+  Data/Textures/*.png
   Data/Textures/*.xml
   Data/Textures/Barrens/*.png
-  Data/Textures/Barrens/LICENSE 
+  Data/Textures/Barrens/LICENSE
 
 library
   hs-source-dirs:      src

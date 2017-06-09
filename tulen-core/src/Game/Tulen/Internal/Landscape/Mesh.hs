@@ -151,10 +151,10 @@ genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
 
     -- List comprehension of vertecies with normals
     points :: [VertWithNorm]
-    points = concat $ flip fmap indecies $ \(y, x) -> let
-      u0 = fromIntegral (floor x) - x
+    points = concat $ flip fmap indecies $ \(y, x) ->let
+      u0 = x
       u1 = u0 + dv
-      t0 = fromIntegral (floor y) - y
+      t0 = y
       t1 = t0 + dv
       in [
           mkVertNorm  x        y       (V2 u0 t0)
