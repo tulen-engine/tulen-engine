@@ -172,7 +172,8 @@ createScene app = do
         d = x'^2 + y'^2
         in 0.00020 * (1 + sin d)
       initTiles arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) ->
-        if | x == 0 && y == 0 -> 1
+        if | x == 1 && y == 1 -> 1
+           | x == 2 && y == 2 -> 1
            | otherwise -> getter (R.Z R.:. y R.:. x)
       chunk = chunk0 {
         landChunkHeightmap = initHeights $ landChunkHeightmap chunk0

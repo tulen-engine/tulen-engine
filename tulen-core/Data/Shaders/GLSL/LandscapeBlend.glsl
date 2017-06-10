@@ -102,7 +102,7 @@ void VS()
 }
 
 // Blend two colors based on alpha
-vec4 blend(vec4 c1, vec4 c2) {
+vec4 blend(vec4 c2, vec4 c1) {
   float a = c1.w + c2.w * (1 - c1.w);
   vec3 c = c1.xyz * c1.w + c2.xyz * c2.w * (1 - c1.w);
   return vec4(c/a, a);
@@ -110,14 +110,11 @@ vec4 blend(vec4 c1, vec4 c2) {
 }
 
 // Blend colors based on sorted order
-vec4 orderedBlend(ivec4 sorted, vec4[4] colors) {
-  vec4 color = blend(colors[sorted.x], colors[sorted.y]);
-  color = blend(color, colors[sorted.z]);
-  //color = blend(color, colors[sorted.w]);
-  //return color;
-  return colors[0];
-  //if (sorted.w == 0) return vec4(0);
-  //  else return vec4(1, 0, 0, 1);
+vec4 orderedBlend(vec4[4] colors) {
+  vec4 color = blend(colors[0], colors[1]);
+  color = blend(color, colors[2]);
+  color = blend(color, colors[3]);
+  return color;
 }
 
 // Sort 4 values and return then ascending in vector
@@ -137,10 +134,10 @@ ivec4 sort4(ivec4 values) {
     }
 
     if (i2 < i3) {
-        low1 = i2;
+        low2 = i2;
         high2 = i3;
     } else {
-        low1 = i3;
+        low2 = i3;
         high2 = i2;
     }
 
@@ -164,6 +161,53 @@ ivec4 sort4(ivec4 values) {
         return ivec4(lowest, middle1, middle2, highest);
     } else {
         return ivec4(lowest, middle2, middle1, highest);
+    }
+}
+
+vec4[4] sort4By(ivec4 is, vec4[4] values) {
+    int lowest, middle1, middle2, highest, low1, low2, high1, high2;
+    vec4 vlowest, vmiddle1, vmiddle2, vhighest, vlow1, vlow2, vhigh1, vhigh2;
+    int i0 = is.x;
+    int i1 = is.y;
+    int i2 = is.z;
+    int i3 = is.w;
+
+    if (i0 < i1) {
+        low1 = i0; vlow1 = values[0];
+        high1 = i1; vhigh1 = values[1];
+    } else {
+        low1 = i1; vlow1 = values[1];
+        high1 = i0; vhigh1 = values[0];
+    }
+
+    if (i2 < i3) {
+        low2 = i2; vlow2 = values[2];
+        high2 = i3; vhigh2 = values[3];
+    } else {
+        low2 = i3; vlow2 = values[3];
+        high2 = i2; vhigh2 = values[2];
+    }
+
+    if (low1 < low2) {
+        lowest = low1; vlowest = vlow1;
+        middle1 = low2; vmiddle1 = vlow2;
+    } else {
+        lowest = low2; vlowest = vlow2;
+        middle1 = low1; vmiddle1 = vlow1;
+    }
+
+    if (high1 > high2) {
+        highest = high1; vhighest = vhigh1;
+        middle2 = high2; vmiddle2 = vhigh2;
+    } else {
+        highest = high2; vhighest = vhigh2;
+        middle2 = high1; vmiddle2 = vhigh1;
+    }
+
+    if (middle1 < middle2) {
+        return vec4[4](vlowest, vmiddle1, vmiddle2, vhighest);
+    } else {
+        return vec4[4](vlowest, vmiddle2, vmiddle1, vhighest);
     }
 }
 
@@ -269,9 +313,8 @@ void PS()
     vec4 color3 = texture(sTileSets1, vec3(tuv + offsets[3], layers.w));
 
     // Get material diffuse albedo
-    //vec4 blendedColor = orderedBlend(sorted, vec4[4](color0, color1, color2, color3));
-    vec4 blendedColor = color2;
-
+    vec4[4] sortedColors = sort4By(layers, vec4[4](color0, color1, color2, color3));
+    vec4 blendedColor = orderedBlend(sortedColors);
     vec4 diffColor = cMatDiffColor * blendedColor;
 
     // Get material specular albedo
