@@ -1,4 +1,5 @@
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE MultiWayIf #-}
 -- | Defines main context of engine that encapsulates all resources in one reference.
 module Game.Tulen.Internal.Core where
 
@@ -169,15 +170,22 @@ createScene app = do
         x' = 0.003 * fromIntegral x
         y' = 0.003 * fromIntegral y
         d = x'^2 + y'^2
-        in 0.00025 * (1 + sin d)
-      chunk = chunk0 { landChunkHeightmap = initHeights $ landChunkHeightmap chunk0 }
+        in 0.00020 * (1 + sin d)
+      initTiles arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) ->
+        if | x == 0 && y == 0 -> 1
+           | otherwise -> getter (R.Z R.:. y R.:. x)
+      chunk = chunk0 {
+        landChunkHeightmap = initHeights $ landChunkHeightmap chunk0
+      , landChunkTiles = initTiles $ landChunkTiles chunk0
+      }
   landMesh <- makeLandMesh context chsize 1 res 1000 chunk
   let model = landMeshModel landMesh
   node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
   nodeSetPosition node $ Vector3 0 0 0
   object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
   staticModelSetModel object model
-  (planeMaterial :: Ptr Material) <- guardJust "Landscape.xml" =<< cacheGetResource cache "Materials/Landscape.xml" True
+  planeMaterial :: Ptr Material <- guardJust "Landscape.xml" =<< cacheGetResource cache "Materials/Landscape.xml" True
+  materialSetTexture planeMaterial TU'Diffuse $ landMeshDetails landMesh
   staticModelSetMaterial object planeMaterial
   drawableSetCastShadows object True
   -- END DEBUG

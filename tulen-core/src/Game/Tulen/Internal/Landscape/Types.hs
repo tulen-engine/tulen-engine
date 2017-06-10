@@ -20,7 +20,7 @@ type Cliffmap = Array U DIM2 Word32
 type Watermap = Array U DIM2 Bool
 
 -- | Stores information which tile ID is stored for given position
-type Tilemap = Array U DIM2 Word32
+type Tilemap = Array U DIM2 Word8
 
 -- | Opacity map for blending layer.
 type BlendLayer = Array U DIM2 Word32

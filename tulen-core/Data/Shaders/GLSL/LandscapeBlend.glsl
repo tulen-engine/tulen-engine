@@ -115,7 +115,7 @@ vec4 orderedBlend(ivec4 sorted, vec4[4] colors) {
   color = blend(color, colors[sorted.z]);
   //color = blend(color, colors[sorted.w]);
   //return color;
-  return colors[sorted.w];
+  return colors[0];
   //if (sorted.w == 0) return vec4(0);
   //  else return vec4(1, 0, 0, 1);
 }
@@ -255,8 +255,9 @@ void PS()
     tuv.y = 1 - tuv.y;
     tuv = tuv * REC_TS;
     // Find which textures are located at corners of tile (encoded in each rgba channel)
-    vec4 tileInfo = texture2D(sTileMap0, vec2(tx, ty));
-    ivec4 layers = ivec4(floor(tileInfo*256));
+    vec4 tileInfo = texture2D(sTileMap0, vec2(tx, 1 - ty));
+    ivec4 layersFlipped = ivec4(floor(tileInfo*256));
+    ivec4 layers = ivec4(layersFlipped.z, layersFlipped.w, layersFlipped.x, layersFlipped.y);
 
     // Decide which tile variant from tileset to use
     ivec4 sorted = sort4(layers);
@@ -269,7 +270,8 @@ void PS()
 
     // Get material diffuse albedo
     //vec4 blendedColor = orderedBlend(sorted, vec4[4](color0, color1, color2, color3));
-    vec4 blendedColor = color3;
+    vec4 blendedColor = color2;
+
     vec4 diffColor = cMatDiffColor * blendedColor;
 
     // Get material specular albedo
