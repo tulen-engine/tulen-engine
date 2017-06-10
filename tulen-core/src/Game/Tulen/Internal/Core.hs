@@ -175,6 +175,12 @@ createScene app = do
         if | x == 1 && y == 1 -> 1
            | x == 2 && y == 2 -> 1
            | x == 3 && y == 2 -> 1
+           | x == 3 && y == 1 -> 2
+           | x == 4 && y == 1 -> 2
+           | x == 4 && y == 2 -> 2
+           | x == 1 && y == 3 -> 6
+           | x == 2 && y == 3 -> 6
+           | x == 3 && y == 3 -> 6
            | otherwise -> getter (R.Z R.:. y R.:. x)
       chunk = chunk0 {
         landChunkHeightmap = initHeights $ landChunkHeightmap chunk0
