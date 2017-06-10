@@ -174,19 +174,30 @@ createScene app = do
       initTiles arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) ->
         if | x == 1 && y == 1 -> 1
            | x == 2 && y == 2 -> 1
+           | x == 3 && y == 2 -> 1
            | otherwise -> getter (R.Z R.:. y R.:. x)
       chunk = chunk0 {
         landChunkHeightmap = initHeights $ landChunkHeightmap chunk0
       , landChunkTiles = initTiles $ landChunkTiles chunk0
       }
+      tileSets = [
+          TileInfo "Textures/Barrens/Barrens_Dirt.png"
+        , TileInfo "Textures/Barrens/Barrens_DirtRough_ext.png"
+        , TileInfo "Textures/Barrens/Barrens_Grass.png"
+        , TileInfo "Textures/Barrens/Barrens_DirtGrass_ext.png"
+        , TileInfo "Textures/Barrens/Barrens_Pebbles_ext.png"
+        , TileInfo "Textures/Barrens/Barrens_Rock_ext.png"
+        ]
   landMesh <- makeLandMesh context chsize 1 res 1000 chunk
   let model = landMeshModel landMesh
   node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
   nodeSetPosition node $ Vector3 0 0 0
   object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
   staticModelSetModel object model
+  tileSetsArray <- makeTilesTexture app tileSets
   planeMaterial :: Ptr Material <- guardJust "Landscape.xml" =<< cacheGetResource cache "Materials/Landscape.xml" True
   materialSetTexture planeMaterial TU'Diffuse $ landMeshDetails landMesh
+  materialSetTexture planeMaterial TU'Normal tileSetsArray
   staticModelSetMaterial object planeMaterial
   drawableSetCastShadows object True
   -- END DEBUG

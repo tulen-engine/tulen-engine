@@ -317,3 +317,30 @@ makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
     , landMeshGeometry = geom
     , landMeshDetails  = tex
     }
+
+-- | Generate texture array for tilesets
+makeTilesTexture :: SharedPtr Application
+  -> V.Vector TileInfo
+  -> IO (SharedPtr Texture2DArray)
+makeTilesTexture app tileInfos = do
+  context <- getContext app
+  tex :: SharedPtr Texture2DArray <- newSharedObject context
+  let layersCount = fromIntegral $ length tileInfos
+      texWidth = 512
+      texHeight = 256
+  texture2DArraySetSize tex layersCount texWidth texHeight getRGBAFormat TextureStatic
+  textureSetFilterMode tex FilterNearest
+  textureSetAddressMode tex CoordU AddressClamp
+  textureSetAddressMode tex CoordV AddressClamp
+  mapM_ (loadLayer tex) $ V.indexed tileInfos
+  pure tex
+  where
+    loadLayer tex (i, TileInfo{..}) = do
+      Just (cache :: Ptr ResourceCache) <- getSubsystem app
+      mtex <- cacheGetResource cache tileResource True
+      case mtex of
+        Nothing -> fail $ "Failed to load tileset texture " ++ tileResource -- TODO: proper error handling
+        Just img -> do
+          -- TODO: resize small variants of tilesets
+          res <- texture2DArraySetDataFromImage tex (fromIntegral i) img False
+          unless res $ putStrLn $ "Failed to bind tileset texture " ++ tileResource ++ " to texture array"
