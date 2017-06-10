@@ -4,6 +4,7 @@ module Game.Tulen.Internal.Landscape.Types where
 import Data.Array.Repa (Array, U, DIM2, Z(..), (:.)(..))
 import Data.Map (Map)
 import Data.Vector (Vector)
+import Data.Vector.Unboxed (Unbox)
 import Data.Word
 import Linear
 
@@ -93,4 +94,5 @@ emptyLandChunk (V2 xs ys) pos res (V2 hxs hys) = LandChunk {
   }
   where
     hmap = R.computeS $ R.fromFunction (Z :. hys :. hxs) (const 0)
+    emptyArr :: Unbox a => a -> Array U DIM2 a
     emptyArr v = R.computeS $ R.fromFunction (Z :. ys :. xs) (const v)

@@ -1,10 +1,10 @@
 -- | Mesh generation for landscape
 module Game.Tulen.Internal.Landscape.Mesh where
 
-import Control.Lens ((^.))
 import Data.Word
 import Foreign
 import Game.Tulen.Internal.Landscape.Types
+import Game.Tulen.Internal.Landscape.Texture
 import Graphics.Urho3D
 import Linear
 
@@ -215,51 +215,6 @@ genTriangleIndecies (V2 sx sy) tsize res vsize hm = SV.fromList points
       i6 = i1 + 1
       in [i1, i2, i3, i4, i5, i6]
 
--- | Copy all tiles to image
--- TODO: neighbour lookup
-copyTilesToImage :: Tilemap -> SharedPtr Image -> IO ()
-copyTilesToImage tm img = mapM_ writePixel is
-  where
-    R.Z R.:. height R.:. width = R.extent tm
-    is :: [(Int, Int)]
-    is = (,) <$> [0 .. height - 1] <*> [0 .. width - 1]
-
-    lookupTilemap :: Int -> Int -> Word8
-    lookupTilemap x y = R.toUnboxed tm UV.! R.toIndex (R.extent tm) (R.Z R.:. y R.:. x)
-
-    writePixel (x, y) = do
-      let toFloat v = (fromIntegral v + 0.01) / 256
-          c0 = toFloat $ lookupTilemap x y
-          c1 = if x == width - 1 then 0
-            else toFloat $ lookupTilemap (x+1) y
-          c2 = if y == height - 1 then 0
-            else toFloat $ lookupTilemap x (y+1)
-          c3 = if x == width - 1 || y == height - 1 then 0
-            else toFloat $ lookupTilemap (x+1) (y+1)
-      imageSetPixel2D img x (height - 1 - y) $ Color c0 c1 c2 c3
-
--- | Generate texture for tile mapping of chunk
-makeDetailTexture :: Ptr Context
-  -> LandChunk
-  -> IO (SharedPtr Texture2D)
-makeDetailTexture context LandChunk{..} =  do
-  -- create image
-  img :: SharedPtr Image <- newSharedObject $ pointer context
-  let R.Z R.:. height R.:. width = R.extent landChunkTiles
-  imageSetSize2D img width height 4
-
-  -- fill with data from tilemap
-  copyTilesToImage landChunkTiles img -- TODO: here (problem with out of sync size of tile texture in shader!)
-
-  -- create texture
-  tex :: SharedPtr Texture2D <- newSharedObject $ pointer context
-  textureSetFilterMode tex FilterNearest
-  textureSetNumLevels tex 1
-  _ <- texture2DSetSize tex width height getRGBAFormat TextureDynamic 1 True
-  _ <- texture2DSetDataFromImage tex img False
-
-  pure tex
-
 -- | Generate new land mesh from given chunk description
 makeLandMesh :: Ptr Context -- ^ Urho context
   -> V2 Int -- ^ Size in tiles of chunk
@@ -317,30 +272,3 @@ makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
     , landMeshGeometry = geom
     , landMeshDetails  = tex
     }
-
--- | Generate texture array for tilesets
-makeTilesTexture :: SharedPtr Application
-  -> V.Vector TileInfo
-  -> IO (SharedPtr Texture2DArray)
-makeTilesTexture app tileInfos = do
-  context <- getContext app
-  tex :: SharedPtr Texture2DArray <- newSharedObject context
-  let layersCount = fromIntegral $ length tileInfos
-      texWidth = 512
-      texHeight = 256
-  texture2DArraySetSize tex layersCount texWidth texHeight getRGBAFormat TextureStatic
-  textureSetFilterMode tex FilterNearest
-  textureSetAddressMode tex CoordU AddressClamp
-  textureSetAddressMode tex CoordV AddressClamp
-  mapM_ (loadLayer tex) $ V.indexed tileInfos
-  pure tex
-  where
-    loadLayer tex (i, TileInfo{..}) = do
-      Just (cache :: Ptr ResourceCache) <- getSubsystem app
-      mtex <- cacheGetResource cache tileResource True
-      case mtex of
-        Nothing -> fail $ "Failed to load tileset texture " ++ tileResource -- TODO: proper error handling
-        Just img -> do
-          -- TODO: resize small variants of tilesets
-          res <- texture2DArraySetDataFromImage tex (fromIntegral i) img False
-          unless res $ putStrLn $ "Failed to bind tileset texture " ++ tileResource ++ " to texture array"

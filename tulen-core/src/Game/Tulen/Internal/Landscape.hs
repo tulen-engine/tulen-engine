@@ -4,4 +4,5 @@ module Game.Tulen.Internal.Landscape(
   ) where
 
 import Game.Tulen.Internal.Landscape.Mesh as X
+import Game.Tulen.Internal.Landscape.Texture as X
 import Game.Tulen.Internal.Landscape.Types as X

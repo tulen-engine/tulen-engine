@@ -188,11 +188,11 @@ createScene app = do
       }
       tileSets = [
           TileInfo "Textures/Barrens/Barrens_Dirt.png"
-        , TileInfo "Textures/Barrens/Barrens_DirtRough_ext.png"
+        , TileInfo "Textures/Barrens/Barrens_DirtRough.png"
         , TileInfo "Textures/Barrens/Barrens_Grass.png"
-        , TileInfo "Textures/Barrens/Barrens_DirtGrass_ext.png"
-        , TileInfo "Textures/Barrens/Barrens_Pebbles_ext.png"
-        , TileInfo "Textures/Barrens/Barrens_Rock_ext.png"
+        , TileInfo "Textures/Barrens/Barrens_DirtGrass.png"
+        , TileInfo "Textures/Barrens/Barrens_Pebbles.png"
+        , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
   landMesh <- makeLandMesh context chsize 1 res 1000 chunk
   let model = landMeshModel landMesh
