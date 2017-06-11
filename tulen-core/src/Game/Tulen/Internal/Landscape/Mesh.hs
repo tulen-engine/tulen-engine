@@ -221,9 +221,10 @@ makeLandMesh :: Ptr Context -- ^ Urho context
   -> Float -- ^ Size of single tile
   -> Int -- ^ Resolution (count of vertecies per tile)
   -> Float -- ^ Vertical scale of heightmap
+  -> Maybe (Tilemap, Tilemap, Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk -- ^ chunk
   -> IO LandMesh
-makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
+makeLandMesh context chunkSize tsize res vscale mneighbours ch@LandChunk{..} = do
   let vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize res vscale landChunkHeightmap
       numVertices = fromIntegral $ SV.length vertNorms
       indexData :: SV.Vector Word32 = genTriangleIndecies chunkSize tsize res vscale landChunkHeightmap
@@ -264,7 +265,7 @@ makeLandMesh context chunkSize tsize res vscale ch@LandChunk{..} = do
   modelSetVertexBuffers model vertexBuffers morphRangeStarts morphRangeCounts
   modelSetIndexBuffers model indexBuffers
 
-  tex <- makeDetailTexture context ch
+  tex <- makeDetailTexture context mneighbours ch
   pure LandMesh {
       landMeshModel    = model
     , landMeshVertex   = vb

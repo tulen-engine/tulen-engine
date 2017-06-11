@@ -1,4 +1,5 @@
 -- | Generation of textures for landscape
+{-# LANGUAGE MultiWayIf #-}
 module Game.Tulen.Internal.Landscape.Texture where
 
 import Data.Word
@@ -15,41 +16,51 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 
--- | Copy all tiles to image
--- TODO: neighbour lookup
-copyTilesToImage :: Tilemap -> SharedPtr Image -> IO ()
-copyTilesToImage tm img = mapM_ writePixel is
+-- | Copy all tiles to image, encodes corners of quad in each of RGBA channels.
+copyTilesToImage :: Tilemap -- ^ Original tilemap
+  -> Maybe (Tilemap, Tilemap, Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> SharedPtr Image -- ^ Where to pack data
+  -> IO ()
+copyTilesToImage tm neigbours img = mapM_ writePixel is
   where
     R.Z R.:. height R.:. width = R.extent tm
     is :: [(Int, Int)]
     is = (,) <$> [0 .. height - 1] <*> [0 .. width - 1]
 
-    lookupTilemap :: Int -> Int -> Word8
-    lookupTilemap x y = R.toUnboxed tm UV.! R.toIndex (R.extent tm) (R.Z R.:. y R.:. x)
+    lookupTilemap :: Tilemap -> Int -> Int -> Word8
+    lookupTilemap m x y = R.toUnboxed tm UV.! R.toIndex (R.extent m) (R.Z R.:. y R.:. x)
+
+    -- lookup with neigbours
+    nlookup :: Int -> Int -> Word8
+    nlookup x y = case neigbours of
+      Nothing -> if x >= width || y >= height then 0 else lookupTilemap tm x y
+      Just (xm, ym, xym) -> if
+        | x >= width && y >= height -> lookupTilemap xym (x-width) (y-height)
+        | x >= width  -> lookupTilemap xm (x-width) y
+        | y >= height -> lookupTilemap ym x (y-height)
+        | otherwise   -> lookupTilemap tm x y
 
     writePixel (x, y) = do
       let toFloat v = (fromIntegral v + 0.01) / 256
-          c0 = toFloat $ lookupTilemap x y
-          c1 = if x == width - 1 then 0
-            else toFloat $ lookupTilemap (x+1) y
-          c2 = if y == height - 1 then 0
-            else toFloat $ lookupTilemap x (y+1)
-          c3 = if x == width - 1 || y == height - 1 then 0
-            else toFloat $ lookupTilemap (x+1) (y+1)
+          c0 = toFloat $ lookupTilemap tm x y
+          c1 = toFloat $ nlookup (x+1) y
+          c2 = toFloat $ nlookup x (y+1)
+          c3 = toFloat $ nlookup (x+1) (y+1)
       imageSetPixel2D img x (height - 1 - y) $ Color c0 c1 c2 c3
 
 -- | Generate texture for tile mapping of chunk
 makeDetailTexture :: Ptr Context
+  -> Maybe (Tilemap, Tilemap, Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk
   -> IO (SharedPtr Texture2D)
-makeDetailTexture context LandChunk{..} =  do
+makeDetailTexture context mneighbours LandChunk{..} =  do
   -- create image
   img :: SharedPtr Image <- newSharedObject $ pointer context
   let R.Z R.:. height R.:. width = R.extent landChunkTiles
   imageSetSize2D img width height 4
 
   -- fill with data from tilemap
-  copyTilesToImage landChunkTiles img -- TODO: here (problem with out of sync size of tile texture in shader!)
+  copyTilesToImage landChunkTiles mneighbours img
 
   -- create texture
   tex :: SharedPtr Texture2D <- newSharedObject $ pointer context

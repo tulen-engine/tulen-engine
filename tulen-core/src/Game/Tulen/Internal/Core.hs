@@ -194,7 +194,7 @@ createScene app = do
         , TileInfo "Textures/Barrens/Barrens_Pebbles.png"
         , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
-  landMesh <- makeLandMesh context chsize 1 res 1000 chunk
+  landMesh <- makeLandMesh context chsize 1 res 1000 Nothing chunk
   let model = landMeshModel landMesh
   node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
   nodeSetPosition node $ Vector3 0 0 0
