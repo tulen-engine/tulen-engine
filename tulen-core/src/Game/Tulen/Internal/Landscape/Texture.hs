@@ -111,7 +111,7 @@ extendTileset src dist = F.foldlM blit dist is
       let Z :. yi :. xi = unindex i
           sourcePos = V2 0 0
           distPos = toBorderedTilePosition $ V2 (xi + 4) yi
-      blitRegionWithBorder src img sourcePos distPos (V2 atlasBleedingBorder atlasTileSize) (V2 atlasBleedingBorder atlasBleedingBorder)
+      blitRegionWithBorder src img sourcePos distPos (V2 atlasTileSize atlasTileSize) (V2 atlasBleedingBorder atlasBleedingBorder)
 
 -- | Copy given tiles to destination with border
 copyTilesWithBorder :: Monad m => RepaImage -> RepaImage -> [V2 Int] -> m RepaImage
@@ -131,8 +131,9 @@ makeTilesTexture app tileInfos = do
       V2 texWidth texHeight = atlasSizePixelsWithBorder
   texture2DArraySetSize tex layersCount texWidth texHeight getRGBAFormat TextureStatic
   textureSetFilterMode tex FilterNearest
-  textureSetAddressMode tex CoordU AddressClamp
-  textureSetAddressMode tex CoordV AddressClamp
+  textureSetAddressMode tex CoordU AddressMirror
+  textureSetAddressMode tex CoordV AddressMirror
+  textureSetNumLevels tex 1
   mapM_ (loadLayer tex) $ V.indexed tileInfos
   pure tex
   where
@@ -152,6 +153,6 @@ makeTilesTexture app tileInfos = do
               copyTilesWithBorder srcArr arr [V2 x y | x <- [0 .. 3], y <- [0 .. 3]]
             else copyTilesWithBorder srcArr distArr [V2 x y | x <- [0 .. 7], y <- [0 .. 3]]
           copyToImage img distBlit
-          imageSavePNG img $ "test" ++ show i ++ ".png"
+          -- imageSavePNG img $ "test" ++ show i ++ ".png"
           res <- texture2DArraySetDataFromImage tex (fromIntegral i) (pointer img) False
           unless res $ putStrLn $ "Failed to bind tileset texture " ++ tileResource ++ " to texture array"

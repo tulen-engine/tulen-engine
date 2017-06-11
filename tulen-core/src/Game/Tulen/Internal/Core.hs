@@ -200,7 +200,9 @@ createScene app = do
   nodeSetPosition node $ Vector3 0 0 0
   object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
   staticModelSetModel object model
+  putStrLn "Making atlases..."
   tileSetsArray <- makeTilesTexture app tileSets
+  putStrLn "Done."
   planeMaterial :: Ptr Material <- guardJust "Landscape.xml" =<< cacheGetResource cache "Materials/Landscape.xml" True
   materialSetTexture planeMaterial TU'Diffuse $ landMeshDetails landMesh
   materialSetTexture planeMaterial TU'Normal tileSetsArray

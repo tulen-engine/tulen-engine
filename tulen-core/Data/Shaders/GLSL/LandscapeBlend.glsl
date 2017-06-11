@@ -7,13 +7,20 @@
 #include "Lighting.glsl"
 #include "Fog.glsl"
 
-#define TILESET_WIDTH 512
-#define TILESET_HEIGHT 256
+#define BORDER_SIZE 10
 #define TILE_SIZE 64
-#define REC_TSX (float(TILE_SIZE)/float(TILESET_WIDTH))
-#define REC_TSY (float(TILE_SIZE)/float(TILESET_HEIGHT))
+#define TILESET_WIDTH_TILES 8
+#define TILESET_HEIGHT_TILES 4
+
+#define TILE_BORDERED_SIZE (TILE_SIZE + 2 * BORDER_SIZE)
+#define TILESET_BORDERED_WIDTH (TILESET_WIDTH_TILES * TILE_BORDERED_SIZE)
+#define TILESET_BORDERED_HEIGHT (TILESET_HEIGHT_TILES * TILE_BORDERED_SIZE)
+#define REC_TSX (float(TILE_BORDERED_SIZE)/float(TILESET_BORDERED_WIDTH))
+#define REC_TSY (float(TILE_BORDERED_SIZE)/float(TILESET_BORDERED_HEIGHT))
 #define REC_TS vec2(REC_TSX, REC_TSY)
+#define BORDER_TS vec2(float(BORDER_SIZE)/float(TILESET_BORDERED_WIDTH), float(BORDER_SIZE)/float(TILESET_BORDERED_HEIGHT))
 #define TILE_OFFSET(x, y) vec2(x * REC_TSX, y * REC_TSY)
+#define PIXEL_SIZE vec2(1/float(TILESET_BORDERED_WIDTH), 1/float(TILESET_BORDERED_HEIGHT))
 
 varying vec4 vWorldPos;
 varying vec3 vNormal;
@@ -297,7 +304,7 @@ void PS()
     // Remove tile offset from UV and transform to match first part of tileset
     vec2 tuv = vTexCoord.xy + 1 - vec2(float(tix), float(tiy));
     tuv.y = 1 - tuv.y;
-    tuv = tuv * REC_TS;
+    tuv = BORDER_TS + tuv * REC_TS * (float(TILE_SIZE) / float(TILE_BORDERED_SIZE));
     // Find which textures are located at corners of tile (encoded in each rgba channel)
     vec4 tileInfo = texture2D(sTileMap0, vec2(tx, 1 - ty));
     ivec4 layersFlipped = ivec4(floor(tileInfo*256));
