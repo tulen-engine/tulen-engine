@@ -62,7 +62,7 @@ makeDetailTexture context LandChunk{..} =  do
 
 -- | How much pixels to add into atlas to prevent edge bleeding
 atlasBleedingBorder :: Int
-atlasBleedingBorder = 10
+atlasBleedingBorder = 0
 
 -- | Size of tile in pixels in atlas
 atlasTileSize :: Int
@@ -130,10 +130,10 @@ makeTilesTexture app tileInfos = do
   let layersCount = fromIntegral $ length tileInfos
       V2 texWidth texHeight = atlasSizePixelsWithBorder
   texture2DArraySetSize tex layersCount texWidth texHeight getRGBAFormat TextureStatic
-  textureSetFilterMode tex FilterNearest
-  textureSetAddressMode tex CoordU AddressMirror
-  textureSetAddressMode tex CoordV AddressMirror
-  textureSetNumLevels tex 1
+  textureSetFilterMode tex FilterNearestAnisotropic
+  textureSetAddressMode tex CoordU AddressClamp
+  textureSetAddressMode tex CoordV AddressClamp
+  -- textureSetNumLevels tex 1
   mapM_ (loadLayer tex) $ V.indexed tileInfos
   pure tex
   where
@@ -153,6 +153,6 @@ makeTilesTexture app tileInfos = do
               copyTilesWithBorder srcArr arr [V2 x y | x <- [0 .. 3], y <- [0 .. 3]]
             else copyTilesWithBorder srcArr distArr [V2 x y | x <- [0 .. 7], y <- [0 .. 3]]
           copyToImage img distBlit
-          -- imageSavePNG img $ "test" ++ show i ++ ".png"
+          imageSavePNG img $ "test" ++ show i ++ ".png"
           res <- texture2DArraySetDataFromImage tex (fromIntegral i) (pointer img) False
           unless res $ putStrLn $ "Failed to bind tileset texture " ++ tileResource ++ " to texture array"

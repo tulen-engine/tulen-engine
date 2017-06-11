@@ -1,4 +1,5 @@
 #version 130
+#extension GL_ARB_texture_query_lod : enable
 
 #include "Uniforms.glsl"
 #include "Samplers.glsl"
@@ -7,10 +8,11 @@
 #include "Lighting.glsl"
 #include "Fog.glsl"
 
-#define BORDER_SIZE 10
+#define BORDER_SIZE 0 // margins for each tile in atlas
 #define TILE_SIZE 64
 #define TILESET_WIDTH_TILES 8
 #define TILESET_HEIGHT_TILES 4
+#define BLEEDING_BORDER 0.5 // count of pixels for highest mipmap level to prevent bleeding
 
 #define TILE_BORDERED_SIZE (TILE_SIZE + 2 * BORDER_SIZE)
 #define TILESET_BORDERED_WIDTH (TILESET_WIDTH_TILES * TILE_BORDERED_SIZE)
@@ -314,10 +316,24 @@ void PS()
     ivec4 sorted = sort4(layers);
     vec2[4] offsets = chooseTileVariants(sorted, layers);
     // Sample tilesets
-    vec4 color0 = texture(sTileSets1, vec3(tuv + offsets[0], layers.x));
-    vec4 color1 = texture(sTileSets1, vec3(tuv + offsets[1], layers.y));
-    vec4 color2 = texture(sTileSets1, vec3(tuv + offsets[2], layers.z));
-    vec4 color3 = texture(sTileSets1, vec3(tuv + offsets[3], layers.w));
+    // Use hack to prevent bleeding on edges due mipmapping. If the textel is located at edge, use +1 mipmap level then usual. 
+    bool isEdge = tuv.x < BORDER_TS.x + BLEEDING_BORDER * PIXEL_SIZE.x || tuv.y < BORDER_TS.y + BLEEDING_BORDER * PIXEL_SIZE.y;
+    vec4 color0, color1, color2, color3;
+    if (isEdge) {
+        float mipmapLevel = 1;
+        #ifdef GL_ARB_texture_query_lod
+            mipmapLevel = textureQueryLOD(sTileSets1, tuv).x;
+        #endif
+        color0 = textureLod(sTileSets1, vec3(tuv + offsets[0], layers.x), mipmapLevel - 1);
+        color1 = textureLod(sTileSets1, vec3(tuv + offsets[1], layers.y), mipmapLevel - 1);
+        color2 = textureLod(sTileSets1, vec3(tuv + offsets[2], layers.z), mipmapLevel - 1);
+        color3 = textureLod(sTileSets1, vec3(tuv + offsets[3], layers.w), mipmapLevel - 1);
+    } else {
+        color0 = texture(sTileSets1, vec3(tuv + offsets[0], layers.x));
+        color1 = texture(sTileSets1, vec3(tuv + offsets[1], layers.y));
+        color2 = texture(sTileSets1, vec3(tuv + offsets[2], layers.z));
+        color3 = texture(sTileSets1, vec3(tuv + offsets[3], layers.w));
+    }
 
     // Get material diffuse albedo
     vec4[4] sortedColors = sort4By(layers, vec4[4](color0, color1, color2, color3));
