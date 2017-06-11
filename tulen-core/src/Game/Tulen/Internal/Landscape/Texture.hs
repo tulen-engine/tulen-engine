@@ -133,7 +133,6 @@ makeTilesTexture app tileInfos = do
   textureSetFilterMode tex FilterNearestAnisotropic
   textureSetAddressMode tex CoordU AddressClamp
   textureSetAddressMode tex CoordV AddressClamp
-  -- textureSetNumLevels tex 1
   mapM_ (loadLayer tex) $ V.indexed tileInfos
   pure tex
   where
@@ -143,16 +142,18 @@ makeTilesTexture app tileInfos = do
       case mtex of
         Nothing -> fail $ "Failed to load tileset texture " ++ tileResource -- TODO: proper error handling
         Just img -> do
-          srcArr <- copyFromImage img
-          let V2 sx sy = atlasSizePixelsWithBorder
-              distArr = R.computeS $ R.fromFunction (Z :. sy :. sx) (const $ Color 0 0 0 0)
+          putStrLn $ "Generating atlas for " ++ show tileResource
           isSmall <- isSmallTileset img
-          distBlit <- if isSmall
-            then do
-              arr <- extendTileset srcArr distArr
-              copyTilesWithBorder srcArr arr [V2 x y | x <- [0 .. 3], y <- [0 .. 3]]
-            else copyTilesWithBorder srcArr distArr [V2 x y | x <- [0 .. 7], y <- [0 .. 3]]
-          copyToImage img distBlit
-          imageSavePNG img $ "test" ++ show i ++ ".png"
+          when (atlasBleedingBorder /= 0 || isSmall) $ do -- no need to modify when no border is defined
+            srcArr <- copyFromImage img
+            let V2 sx sy = atlasSizePixelsWithBorder
+                distArr = R.computeS $ R.fromFunction (Z :. sy :. sx) (const $ Color 0 0 0 0)
+            distBlit <- if isSmall
+              then do
+                arr <- extendTileset srcArr distArr
+                copyTilesWithBorder srcArr arr [V2 x y | x <- [0 .. 3], y <- [0 .. 3]]
+              else copyTilesWithBorder srcArr distArr [V2 x y | x <- [0 .. 7], y <- [0 .. 3]]
+            copyToImage img distBlit
+          -- imageSavePNG img $ "test" ++ show i ++ ".png"
           res <- texture2DArraySetDataFromImage tex (fromIntegral i) (pointer img) False
           unless res $ putStrLn $ "Failed to bind tileset texture " ++ tileResource ++ " to texture array"
