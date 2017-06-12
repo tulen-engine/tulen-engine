@@ -168,3 +168,23 @@ makeTilesTexture app tileInfos = do
           -- imageSavePNG img $ "test" ++ show i ++ ".png"
           res <- texture2DArraySetDataFromImage tex (fromIntegral i) (pointer img) False
           unless res $ putStrLn $ "Failed to bind tileset texture " ++ tileResource ++ " to texture array"
+
+-- | Render technique for landscape
+landscapeTechniqueName :: String
+landscapeTechniqueName = "Techniques/LandscapeBlend.xml"
+
+-- | Create landscape material that can be cloned between different chunks.
+makeLandscapeMaterial :: SharedPtr Application -> IO (SharedPtr Material)
+makeLandscapeMaterial app = do
+  context <- getContext app
+  Just (cache :: Ptr ResourceCache) <- getSubsystem app
+  mtech <- cacheGetResource cache landscapeTechniqueName True
+  case mtech of
+    Nothing -> fail $ "Failed to load technique for landscape " ++ landscapeTechniqueName -- TODO: error handling
+    Just tech -> do
+      mat :: SharedPtr Material <- newSharedObject context
+      materialSetNumTechniques mat 1
+      materialSetTechnique mat 0 tech 0 0.0
+      materialSetShaderParameter mat "MatSpecColor" $ Color 0 0 0 16
+      materialSetShaderParameter mat "ChunkSize" (10 :: Int)
+      pure mat

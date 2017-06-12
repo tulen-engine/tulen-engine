@@ -12,9 +12,10 @@ import Paths_tulen_core
 import System.Directory
 
 -- DEBUG
-import Game.Tulen.Internal.Landscape
-import qualified Data.Array.Repa as R
 import Debug.Trace
+import Game.Tulen.Internal.Landscape
+import Linear
+import qualified Data.Array.Repa as R
 -- end DEBUG
 
 -- | Main context of engine. Here goes all referencies to internal resources.
@@ -194,20 +195,13 @@ createScene app = do
         , TileInfo "Textures/Barrens/Barrens_Pebbles.png"
         , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
-  landMesh <- makeLandMesh context chsize 1 res 1000 Nothing chunk
-  let model = landMeshModel landMesh
-  node <- nodeCreateChild scene "FromScratchObject" CM'Replicated 0
-  nodeSetPosition node $ Vector3 0 0 0
-  object :: Ptr StaticModel <- guardJust "static model for debug" =<< nodeCreateComponent node Nothing Nothing
-  staticModelSetModel object model
-  putStrLn "Making atlases..."
-  tileSetsArray <- makeTilesTexture app tileSets
-  putStrLn "Done."
-  planeMaterial :: Ptr Material <- guardJust "Landscape.xml" =<< cacheGetResource cache "Materials/Landscape.xml" True
-  materialSetTexture planeMaterial TU'Diffuse $ landMeshDetails landMesh
-  materialSetTexture planeMaterial TU'Normal tileSetsArray
-  staticModelSetMaterial object planeMaterial
-  drawableSetCastShadows object True
+      landscape = (emptyLandscape 1) {
+          landscapeChunks = [(V2 0 0, chunk)]
+        , landscapeTiles  = tileSets
+        , landscapeChunkSize = chsize ^. _x
+        , landscapeResolution = res
+        }
+  loadLandscape app (parentPointer scene) landscape
   -- END DEBUG
   --------
 

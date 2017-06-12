@@ -28,7 +28,6 @@ varying vec4 vWorldPos;
 varying vec3 vNormal;
 varying vec2 vTexCoord;
 
-uniform float cTileResolution;
 uniform float cChunkSize;
 
 #ifdef PERPIXEL
@@ -316,7 +315,7 @@ void PS()
     ivec4 sorted = sort4(layers);
     vec2[4] offsets = chooseTileVariants(sorted, layers);
     // Sample tilesets
-    // Use hack to prevent bleeding on edges due mipmapping. If the textel is located at edge, use +1 mipmap level then usual. 
+    // Use hack to prevent bleeding on edges due mipmapping. If the textel is located at edge, use +1 mipmap level then usual.
     bool isEdge = tuv.x < BORDER_TS.x + BLEEDING_BORDER * PIXEL_SIZE.x || tuv.y < BORDER_TS.y + BLEEDING_BORDER * PIXEL_SIZE.y;
     vec4 color0, color1, color2, color3;
     if (isEdge) {

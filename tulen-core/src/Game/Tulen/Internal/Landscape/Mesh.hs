@@ -35,10 +35,9 @@ data LandMesh = LandMesh {
 data VertWithNorm = VertWithNorm !(V3 Float) !(V3 Float) !(V2 Float)
   deriving (Show)
 
--- | TODO: ensure that alignment is honored
 instance Storable VertWithNorm where
   sizeOf _  = 2 * sizeOf (undefined :: V3 Float) + sizeOf (undefined :: V2 Float)
-  alignment _ = 1
+  alignment _ = 1 -- no aligment for packed data
   peek ptr = do
     v1 <- peek . castPtr $ ptr
     v2 <- peek . castPtr $ ptr `plusPtr` sizeOf (undefined :: V3 Float)

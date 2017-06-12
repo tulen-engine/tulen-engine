@@ -9,6 +9,7 @@ import Data.Word
 import Linear
 
 import qualified Data.Array.Repa as R
+import qualified Data.Map.Strict as M
 
 -- | Heightmap is int32 two dimensional array
 type Heightmap = Array U DIM2 Float
@@ -29,15 +30,21 @@ type BlendLayer = Array U DIM2 Word32
 -- | Describes all landscape data
 data Landscape = Landscape {
 -- | Collection of chunks by it offset
-  landscapeChunks     :: !(Map (V2 Int) LandChunk)
+  landscapeChunks        :: !(Map (V2 Int) LandChunk)
 -- | Chunk size in tiles
-, landscapeChunkSize  :: !Int
+, landscapeChunkSize     :: !Int
   -- | Global water level
-, landscapeWaterLevel :: !Double
+, landscapeWaterLevel    :: !Float
   -- | Holds global info about tiles
-, landscapeTiles      :: !(Vector TileInfo)
+, landscapeTiles         :: !(Vector TileInfo)
   -- | Holds global info about blending layers
-, landscapeBlending   :: !(Vector BlendInfo)
+, landscapeBlending      :: !(Vector BlendInfo)
+  -- | Size of single tile in world units
+, landscapeTileScale     :: !Float
+  -- | Number of vertecies per tile side
+, landscapeResolution    :: !Int
+  -- | Size of the highest possible terrain point in world units
+, landscapeVerticalScale :: !Float
 }
 
 -- | Chunk of landscape
@@ -71,6 +78,27 @@ data BlendInfo = BlendInfo {
   -- | Refernce to blend texture (TODO)
   blendResource :: !String
 }
+
+-- | Get empty landscape with given size and default settings
+emptyLandscape :: V2 Int -- ^ Size of landscape in chunks
+  -> Landscape
+emptyLandscape (V2 sx sy) = Landscape {
+    landscapeChunks = M.fromList [(V2 x y, emptyLandChunk (V2 csize csize) (V2 x y) res hres) |
+        x <- [0 .. sx]
+      , y <- [0 .. sy]
+      ]
+  , landscapeChunkSize = 16
+  , landscapeWaterLevel = -1
+  , landscapeTiles = mempty
+  , landscapeBlending = mempty
+  , landscapeTileScale = 1
+  , landscapeResolution = 30
+  , landscapeVerticalScale = res
+  }
+  where
+    csize = 16
+    res = 1000
+    hres = V2 1024 1024
 
 -- | Get empty land chunk (simple plain with no tiles)
 emptyLandChunk ::
