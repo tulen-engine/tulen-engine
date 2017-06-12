@@ -16,6 +16,7 @@ import Debug.Trace
 import Game.Tulen.Internal.Landscape
 import Linear
 import qualified Data.Array.Repa as R
+import qualified Data.Map.Strict as M
 -- end DEBUG
 
 -- | Main context of engine. Here goes all referencies to internal resources.
@@ -195,8 +196,8 @@ createScene app = do
         , TileInfo "Textures/Barrens/Barrens_Pebbles.png"
         , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
-      landscape = (emptyLandscape 1) {
-          landscapeChunks = [(V2 0 0, chunk)]
+      landscape = (emptyLandscape 2) {
+          landscapeChunks = M.fromList [(V2 x y, chunk)| x <- [0 .. 1], y <- [0 .. 1]]
         , landscapeTiles  = tileSets
         , landscapeChunkSize = chsize ^. _x
         , landscapeResolution = res

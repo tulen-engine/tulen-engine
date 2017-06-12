@@ -64,7 +64,7 @@ loadLandscape app scene l@Landscape{..} = do
           name = "LandChunk_" ++ show xi ++ "_" ++ show yi
       node <- nodeCreateChild landNode name CM'Local 0
       let toPos v = fromIntegral (v * landscapeChunkSize) * landscapeTileScale
-      nodeSetPosition node $ Vector3 (toPos xi) (toPos yi) 0
+      nodeSetPosition node $ Vector3 (toPos xi) 0 (toPos yi)
       mobject <- nodeCreateComponent node Nothing Nothing
       case mobject of
         Nothing -> fail $ "Failed to create chunk static model for " ++ name -- TODO: error handling
