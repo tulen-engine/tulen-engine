@@ -53,8 +53,6 @@ data LandChunk = LandChunk {
   landChunkPos        :: !(V2 Int)
   -- | Heightmap that defines height of each point in landscape piece.
 , landChunkHeightmap  :: !Heightmap
-  -- | Number of vertecies per side of a tile of heightmap to generate.
-, landChunkResolution :: !Int
   -- | Info about cliffs
 , landChunkCliffs     :: !Cliffmap
   -- | Info about water plains
@@ -83,7 +81,7 @@ data BlendInfo = BlendInfo {
 emptyLandscape :: V2 Int -- ^ Size of landscape in chunks
   -> Landscape
 emptyLandscape (V2 sx sy) = Landscape {
-    landscapeChunks = M.fromList [(V2 x y, emptyLandChunk (V2 csize csize) (V2 x y) res hres) |
+    landscapeChunks = M.fromList [(V2 x y, emptyLandChunk (V2 csize csize) (V2 x y) hres) |
         x <- [0 .. sx]
       , y <- [0 .. sy]
       ]
@@ -93,11 +91,10 @@ emptyLandscape (V2 sx sy) = Landscape {
   , landscapeBlending = mempty
   , landscapeTileScale = 1
   , landscapeResolution = 30
-  , landscapeVerticalScale = res
+  , landscapeVerticalScale = 1000
   }
   where
     csize = 16
-    res = 1000
     hres = V2 1024 1024
 
 -- | Get empty land chunk (simple plain with no tiles)
@@ -105,15 +102,12 @@ emptyLandChunk ::
      V2 Int -- ^ Size in tiles
   -- | Offset in landscape
   -> V2 Int
-  -- | Number of vertecies per side of tile for heightmap to generate.
-  -> Int
   -- | Resolution of heightmap
   -> V2 Int
   -> LandChunk
-emptyLandChunk (V2 xs ys) pos res (V2 hxs hys) = LandChunk {
+emptyLandChunk (V2 xs ys) pos (V2 hxs hys) = LandChunk {
     landChunkPos        = pos
   , landChunkHeightmap  = hmap
-  , landChunkResolution = res
   , landChunkCliffs     = emptyArr 0
   , landChunkWater      = emptyArr False
   , landChunkTiles      = emptyArr 0

@@ -165,8 +165,7 @@ createScene app = do
 
   --------
   -- DEBUG
-  let chsize = 10
-      res = 10
+  let res = 10
       initTiles arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) ->
         if | x == 1 && y == 1 -> 1
            | x == 2 && y == 2 -> 1
