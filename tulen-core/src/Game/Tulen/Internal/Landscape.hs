@@ -3,8 +3,10 @@ module Game.Tulen.Internal.Landscape(
     module X
   , LoadedLandscape(..)
   , loadLandscape
+  , landscapeHeightsFromFunction
   ) where
 
+import Data.Functor.Identity
 import Data.Map.Strict (Map)
 import Foreign
 import Graphics.Urho3D
@@ -14,6 +16,7 @@ import Game.Tulen.Internal.Landscape.Mesh as X
 import Game.Tulen.Internal.Landscape.Texture as X
 import Game.Tulen.Internal.Landscape.Types as X
 
+import qualified Data.Array.Repa as R
 import qualified Data.Map.Strict as M
 
 -- | Landscape alongside with all objects that were generated for rendering
@@ -74,3 +77,21 @@ loadLandscape app scene l@Landscape{..} = do
           staticModelSetMaterial object material
           drawableSetCastShadows object True
           pure landMesh
+
+-- | Set all heights in landscape from function. Coordinates passed in the function are world coordinates and
+-- outup height is in world units too.
+landscapeHeightsFromFunction :: (V2 Float -> Float) -> Landscape -> Landscape
+landscapeHeightsFromFunction f land = land { landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land }
+  where
+    v2 v = V2 v v
+    chunkSize = fmap fromIntegral . v2 $ landscapeChunkSize land
+    tileScale =  v2 (landscapeTileScale land)
+    chunk2world v = fmap fromIntegral v * tileScale * chunkSize
+    updChunk chunkCoord chunk = let
+      chunkOrigin = chunk2world chunkCoord
+      R.Z R.:. height R.:. width = R.extent $ landChunkHeightmap chunk
+      updHeightmap arr = runIdentity . R.computeP . R.traverse arr id $ \_ (R.Z R.:. y' R.:. x) -> let
+        y = height - y'
+        chunkPoint = chunkOrigin + chunkSize * tileScale * fmap fromIntegral (V2 x y) / fmap fromIntegral (V2 width height)
+        in f chunkPoint / landscapeVerticalScale land
+      in chunk { landChunkHeightmap = updHeightmap $ landChunkHeightmap chunk}

@@ -166,13 +166,7 @@ createScene app = do
   --------
   -- DEBUG
   let chsize = 10
-      res = 30
-      chunk0 = emptyLandChunk chsize 0 res 1000
-      initHeights arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) -> let
-        x' = 0.003 * fromIntegral x
-        y' = 0.003 * fromIntegral y
-        d = x'^2 + y'^2
-        in 0.00020 * (1 + sin d)
+      res = 10
       initTiles arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) ->
         if | x == 1 && y == 1 -> 1
            | x == 2 && y == 2 -> 1
@@ -184,10 +178,6 @@ createScene app = do
            | x == 2 && y == 3 -> 6
            | x == 3 && y == 3 -> 6
            | otherwise -> getter (R.Z R.:. y R.:. x)
-      chunk = chunk0 {
-        landChunkHeightmap = initHeights $ landChunkHeightmap chunk0
-      , landChunkTiles = initTiles $ landChunkTiles chunk0
-      }
       tileSets = [
           TileInfo "Textures/Barrens/Barrens_Dirt.png"
         , TileInfo "Textures/Barrens/Barrens_DirtRough.png"
@@ -196,10 +186,9 @@ createScene app = do
         , TileInfo "Textures/Barrens/Barrens_Pebbles.png"
         , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
-      landscape = (emptyLandscape 2) {
-          landscapeChunks = M.fromList [(V2 x y, chunk)| x <- [0 .. 1], y <- [0 .. 1]]
-        , landscapeTiles  = tileSets
-        , landscapeChunkSize = chsize ^. _x
+      initHeights (V2 x y) = 1 + sin (0.002 * (x^2 + y^2))
+      landscape = landscapeHeightsFromFunction initHeights $ (emptyLandscape 5) {
+          landscapeTiles  = tileSets
         , landscapeResolution = res
         }
   loadLandscape app (parentPointer scene) landscape
