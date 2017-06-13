@@ -178,8 +178,8 @@ createScene app = do
            | x == 2 && y == 3 -> 6
            | x == 3 && y == 3 -> 6
            | x == 1 && y == 1 -> 6
-           | x == 15 -> 2
-           | y == 15 -> 3
+           | x == 32 -> 2
+           | y == 16 -> 3
            | otherwise -> 0
       tileSets = [
           TileInfo "Textures/Barrens/Barrens_Dirt.png"

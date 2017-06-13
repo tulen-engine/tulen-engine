@@ -30,7 +30,7 @@ copyTilesToImage tm (mxm, mym, mxym) img = mapM_ writePixel is
     is = (,) <$> [0 .. height - 1] <*> [0 .. width - 1]
 
     lookupTilemap :: Tilemap -> Int -> Int -> Word8
-    lookupTilemap m x y = R.toUnboxed tm UV.! R.toIndex (R.extent m) (R.Z R.:. y R.:. x)
+    lookupTilemap m x y = R.toUnboxed m UV.! R.toIndex (R.extent m) (R.Z R.:. y R.:. x)
 
     -- lookup with neigbours
     nlookup :: Int -> Int -> Word8

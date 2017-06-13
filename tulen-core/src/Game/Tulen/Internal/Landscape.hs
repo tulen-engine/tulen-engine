@@ -75,7 +75,7 @@ loadLandscape app scene l@Landscape{..} = do
       let model = landMeshModel landMesh
           name = "LandChunk_" ++ show xi ++ "_" ++ show yi
       node <- nodeCreateChild landNode name CM'Local 0
-      let toPos v = fromIntegral (v * (landscapeChunkSize + 1)) * landscapeTileScale
+      let toPos v = fromIntegral (v * landscapeChunkSize) * landscapeTileScale
       nodeSetPosition node $ Vector3 (toPos xi) 0 (toPos yi)
       mobject <- nodeCreateComponent node Nothing Nothing
       case mobject of
