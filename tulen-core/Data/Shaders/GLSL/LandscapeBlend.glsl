@@ -12,7 +12,7 @@
 #define TILE_SIZE 64
 #define TILESET_WIDTH_TILES 8
 #define TILESET_HEIGHT_TILES 4
-#define BLEEDING_BORDER 0.1 // count of pixels for highest mipmap level to prevent bleeding
+#define BLEEDING_BORDER 0.5 // count of pixels for highest mipmap level to prevent bleeding
 
 #define TILE_BORDERED_SIZE (TILE_SIZE + 2 * BORDER_SIZE)
 #define TILESET_BORDERED_WIDTH (TILESET_WIDTH_TILES * TILE_BORDERED_SIZE)
@@ -233,10 +233,11 @@ vec2[4] chooseTileVariants(ivec4 sorted, ivec4 layers)
   bool monotile = i0 == i1 && i0 == i2 && i0 == i3;
   // Topleft corner
   if (i0 == sorted.x || monotile) {
+  //if (monotile) {
     o0 = TILE_OFFSET(0, 0);
   } else if (i0 == i1) {
-    if      (i0 == i2) { o0 = TILE_OFFSET(1, 3); }
-    else if (i0 == i3) { o0 = TILE_OFFSET(2, 3); }
+    if      (i0 == i2) { o0 = TILE_OFFSET(2, 3); }
+    else if (i0 == i3) { o0 = TILE_OFFSET(1, 3); }
     else               { o0 = TILE_OFFSET(0, 3); }
   } else if (i0 == i2) {
     if      (i0 == i3) { o0 = TILE_OFFSET(3, 2); }
@@ -248,6 +249,7 @@ vec2[4] chooseTileVariants(ivec4 sorted, ivec4 layers)
   }
   // Topright corner
   if (i1 == sorted.x || monotile) {
+  //if (monotile) {
     o1 = TILE_OFFSET(0, 0);
   } else if (i1 == i0) {
     if      (i1 == i2) { o1 = TILE_OFFSET(2, 3); }
@@ -263,6 +265,7 @@ vec2[4] chooseTileVariants(ivec4 sorted, ivec4 layers)
   }
   // Bottomleft corner
   if (i2 == sorted.x || monotile) {
+  //if (monotile) {
     o2 = TILE_OFFSET(0, 0);
   } else if (i2 == i0) {
     if      (i2 == i1) { o2 = TILE_OFFSET(2, 3); }
@@ -278,6 +281,7 @@ vec2[4] chooseTileVariants(ivec4 sorted, ivec4 layers)
   }
   // Bottomright corner
   if (i3 == sorted.x || monotile) {
+  //if (monotile) {
     o3 = TILE_OFFSET(0, 0);
   } else if (i3 == i0) {
     if      (i3 == i1) { o3 = TILE_OFFSET(1, 3); }
