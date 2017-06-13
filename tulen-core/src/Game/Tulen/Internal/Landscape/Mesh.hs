@@ -1,4 +1,5 @@
 -- | Mesh generation for landscape
+{-# LANGUAGE ViewPatterns #-}
 module Game.Tulen.Internal.Landscape.Mesh where
 
 import Data.Word
@@ -82,8 +83,9 @@ genHeightVertecies :: V2 Int -- ^ Size in tiles
   -> Int -- ^ Resolution (number of vertecies by tile)
   -> Float -- ^ Vertical scale of heightmap
   -> Heightmap -- ^ Heightmap of chunk
+  -> (Maybe Heightmap, Maybe Heightmap) -- ^ Neighbour heighmaps in +X and +Y directions (to asure that there is no gaps)
   -> SV.Vector VertWithNorm
-genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
+genHeightVertecies (V2 sx sy) tsize res vsize hm (mhmx, mhmy) = SV.fromList points
   where
     -- convert to model space from tile integral coords
     toModel :: Float -> Float -> (Float, Float)
@@ -98,11 +100,19 @@ genHeightVertecies (V2 sx sy) tsize res vsize hm = SV.fromList points
 
     -- Input should be in [0 .. size] range, heightmap pixel space
     getHVal :: Float -> Float -> Float
-    getHVal x y = let
-      R.Z R.:. yhs R.:. xhs = R.extent hm
-      xclamp = max 0 . min (xhs-1) . floor
-      yclamp = max 0 . min (yhs-1) . floor
-      in R.index hm (R.Z R.:. yclamp y R.:. xclamp x)
+    getHVal x y
+      | isXEdge, Just hmx <- mhmx = guardedIndex hmx 0 y
+      | isYEdge, Just hmy <- mhmy = guardedIndex hmy x (fromIntegral $ yhs-1)
+      | otherwise = guardedIndex hm x y
+      where
+        R.Z R.:. yhs R.:. xhs = R.extent hm
+        isXEdge = floor x >= xhs-1
+        isYEdge = floor y <= 0
+        guardedIndex m vx vy = let
+          R.Z R.:. h R.:. w = R.extent m
+          xclamp = max 0 . min (w-1) . floor
+          yclamp = max 0 . min (h-1) . floor
+          in R.index m (R.Z R.:. yclamp vy R.:. xclamp vx)
 
     -- Input should be in [0 .. size] range in hieghtmap pixel space
     getHeightHM :: Float -> Float -> Float
@@ -220,13 +230,14 @@ makeLandMesh :: Ptr Context -- ^ Urho context
   -> Float -- ^ Size of single tile
   -> Int -- ^ Resolution (count of vertecies per tile)
   -> Float -- ^ Vertical scale of heightmap
-  -> Maybe (Tilemap, Tilemap, Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> (Maybe LandChunk, Maybe LandChunk, Maybe LandChunk) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk -- ^ chunk
   -> IO LandMesh
-makeLandMesh context chunkSize tsize res vscale mneighbours ch@LandChunk{..} = do
-  let vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize res vscale landChunkHeightmap
+makeLandMesh context chunkSize tsize res vscale mneighbours ch = do
+  let heightmapNeighbours = (\(x, y, _) -> (fmap landChunkHeightmap x, fmap landChunkHeightmap y)) mneighbours
+      vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize res vscale (landChunkHeightmap ch) heightmapNeighbours
       numVertices = fromIntegral $ SV.length vertNorms
-      indexData :: SV.Vector Word32 = genTriangleIndecies chunkSize tsize res vscale landChunkHeightmap
+      indexData :: SV.Vector Word32 = genTriangleIndecies chunkSize tsize res vscale (landChunkHeightmap ch)
       numIndecies = fromIntegral $ SV.length indexData
 
   model :: SharedPtr Model <- newSharedObject $ pointer context
@@ -264,7 +275,8 @@ makeLandMesh context chunkSize tsize res vscale mneighbours ch@LandChunk{..} = d
   modelSetVertexBuffers model vertexBuffers morphRangeStarts morphRangeCounts
   modelSetIndexBuffers model indexBuffers
 
-  tex <- makeDetailTexture context mneighbours ch
+  let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
+  tex <- makeDetailTexture context tileNeighbours ch
   pure LandMesh {
       landMeshModel    = model
     , landMeshVertex   = vb

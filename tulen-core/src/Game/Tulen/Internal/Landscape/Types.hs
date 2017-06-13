@@ -1,6 +1,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 module Game.Tulen.Internal.Landscape.Types where
 
+import Control.Lens (view)
 import Data.Array.Repa (Array, U, DIM2, Z(..), (:.)(..))
 import Data.Map (Map)
 import Data.Vector (Vector)
@@ -46,6 +47,26 @@ data Landscape = Landscape {
   -- | Size of the highest possible terrain point in world units
 , landscapeVerticalScale :: !Float
 }
+
+-- | Get landscape positive direction bounds
+landscapeHighBounds :: Landscape -> V2 Int
+landscapeHighBounds Landscape{..}
+  | M.null landscapeChunks = 0
+  | otherwise = let
+    coords = M.keys landscapeChunks
+    maxx = maximum $ view _x <$> coords
+    maxy = maximum $ view _y <$> coords
+    in V2 maxx maxy
+
+-- | Get landscape positive direction bounds
+landscapeLowBounds :: Landscape -> V2 Int
+landscapeLowBounds Landscape{..}
+  | M.null landscapeChunks = 0
+  | otherwise = let
+    coords = M.keys landscapeChunks
+    minx = minimum $ view _x <$> coords
+    miny = minimum $ view _y <$> coords
+    in V2 minx miny
 
 -- | Chunk of landscape
 data LandChunk = LandChunk {

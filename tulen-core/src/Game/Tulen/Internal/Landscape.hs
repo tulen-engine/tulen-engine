@@ -62,7 +62,11 @@ loadLandscape app scene l@Landscape{..} = do
     loadChunk :: SharedPtr Material -> Ptr Node -> SharedPtr Texture2DArray -> V2 Int -> LandChunk -> IO LandMesh
     loadChunk matTemplate landNode tileSetsArray (V2 xi yi) chunk = do
       context <- getContext app
-      landMesh <- makeLandMesh context (V2 landscapeChunkSize landscapeChunkSize) landscapeTileScale landscapeResolution landscapeVerticalScale Nothing chunk
+      let xneigh  = M.lookup (V2 (xi+1) yi) landscapeChunks
+          yneigh  = M.lookup (V2 xi (yi+1)) landscapeChunks
+          xyneigh = M.lookup (V2 (xi+1) (yi+1)) landscapeChunks
+          mneighbours = (xneigh, yneigh, xyneigh)
+      landMesh <- makeLandMesh context (V2 landscapeChunkSize landscapeChunkSize) landscapeTileScale landscapeResolution landscapeVerticalScale mneighbours chunk
       let model = landMeshModel landMesh
           name = "LandChunk_" ++ show xi ++ "_" ++ show yi
       node <- nodeCreateChild landNode name CM'Local 0

@@ -16,12 +16,14 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 
+import Debug.Trace
+
 -- | Copy all tiles to image, encodes corners of quad in each of RGBA channels.
 copyTilesToImage :: Tilemap -- ^ Original tilemap
-  -> Maybe (Tilemap, Tilemap, Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> SharedPtr Image -- ^ Where to pack data
   -> IO ()
-copyTilesToImage tm neigbours img = mapM_ writePixel is
+copyTilesToImage tm (mxm, mym, mxym) img = mapM_ writePixel is
   where
     R.Z R.:. height R.:. width = R.extent tm
     is :: [(Int, Int)]
@@ -32,13 +34,13 @@ copyTilesToImage tm neigbours img = mapM_ writePixel is
 
     -- lookup with neigbours
     nlookup :: Int -> Int -> Word8
-    nlookup x y = case neigbours of
-      Nothing -> if x >= width || y >= height then 0 else lookupTilemap tm x y
-      Just (xm, ym, xym) -> if
-        | x >= width && y >= height -> lookupTilemap xym (x-width) (y-height)
-        | x >= width  -> lookupTilemap xm (x-width) y
-        | y >= height -> lookupTilemap ym x (y-height)
-        | otherwise   -> lookupTilemap tm x y
+    nlookup x y
+      | x >= width && y >= height, Just xym <- mxym = lookupTilemap xym 0 0
+      | x >= width && y >= height, Nothing <- mxym = 0
+      | x >= width, Just xm <- mxm = lookupTilemap xm 0 y
+      | y >= height, Just ym <- mym = lookupTilemap ym x 0
+      | x >= width || y >= height = 0
+      | otherwise = lookupTilemap tm x y
 
     writePixel (x, y) = do
       let toFloat v = (fromIntegral v + 0.01) / 256
@@ -50,7 +52,7 @@ copyTilesToImage tm neigbours img = mapM_ writePixel is
 
 -- | Generate texture for tile mapping of chunk
 makeDetailTexture :: Ptr Context
-  -> Maybe (Tilemap, Tilemap, Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk
   -> IO (SharedPtr Texture2D)
 makeDetailTexture context mneighbours LandChunk{..} =  do
