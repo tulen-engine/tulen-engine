@@ -106,7 +106,7 @@ emptyLandscape (V2 sx sy) = Landscape {
         x <- [0 .. sx]
       , y <- [0 .. sy]
       ]
-  , landscapeChunkSize = 16
+  , landscapeChunkSize = csize
   , landscapeWaterLevel = -1
   , landscapeTiles = mempty
   , landscapeBlending = mempty

@@ -12,7 +12,7 @@
 #define TILE_SIZE 64
 #define TILESET_WIDTH_TILES 8
 #define TILESET_HEIGHT_TILES 4
-#define BLEEDING_BORDER 0.05 // count of pixels for highest mipmap level to prevent bleeding
+#define BLEEDING_BORDER 0.1 // count of pixels for highest mipmap level to prevent bleeding
 
 #define TILE_BORDERED_SIZE (TILE_SIZE + 2 * BORDER_SIZE)
 #define TILESET_BORDERED_WIDTH (TILESET_WIDTH_TILES * TILE_BORDERED_SIZE)

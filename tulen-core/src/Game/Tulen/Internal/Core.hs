@@ -166,8 +166,9 @@ createScene app = do
   --------
   -- DEBUG
   let res = 10
-      initTiles arr = R.computeS $ R.traverse arr id $ \getter (R.Z R.:. y R.:. x) ->
-        if | x == 1 && y == 1 -> 1
+      initTiles v@(V2 x y) =
+        if
+           | x == 1 && y == 1 -> 1
            | x == 2 && y == 2 -> 1
            | x == 3 && y == 2 -> 1
            | x == 3 && y == 1 -> 2
@@ -176,7 +177,10 @@ createScene app = do
            | x == 1 && y == 3 -> 6
            | x == 2 && y == 3 -> 6
            | x == 3 && y == 3 -> 6
-           | otherwise -> getter (R.Z R.:. y R.:. x)
+           | x == 1 && y == 1 -> 6
+           | x == 15 -> 2
+           | y == 15 -> 3
+           | otherwise -> 0
       tileSets = [
           TileInfo "Textures/Barrens/Barrens_Dirt.png"
         , TileInfo "Textures/Barrens/Barrens_DirtRough.png"
@@ -186,7 +190,7 @@ createScene app = do
         , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
       initHeights (V2 x y) = 1 + sin (0.002 * (x^2 + y^2))
-      landscape = landscapeHeightsFromFunction initHeights $ (emptyLandscape 5) {
+      landscape = landscapeTilesFromFunction initTiles $ landscapeHeightsFromFunction initHeights $ (emptyLandscape 5) {
           landscapeTiles  = tileSets
         , landscapeResolution = res
         }

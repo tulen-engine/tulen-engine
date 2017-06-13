@@ -4,10 +4,13 @@ module Game.Tulen.Internal.Landscape(
   , LoadedLandscape(..)
   , loadLandscape
   , landscapeHeightsFromFunction
+  , landscapeTilesFromFunction
   ) where
 
+import Control.Lens ((^.))
 import Data.Functor.Identity
 import Data.Map.Strict (Map)
+import Debug.Trace
 import Foreign
 import Graphics.Urho3D
 import Linear
@@ -54,9 +57,11 @@ loadLandscape app scene l@Landscape{..} = do
       -- cmat <- materialClone matTemplate ""
       -- TODO: check why previous line doesn't work at all
       Just (cache :: Ptr ResourceCache) <- getSubsystem app
-      Just (cmat :: Ptr Material) <- cacheGetResource cache "Materials/Landscape.xml" True
+      Just (cmat' :: Ptr Material) <- cacheGetResource cache "Materials/Landscape.xml" True
+      cmat <- materialClone cmat' ""
       materialSetTexture cmat TU'Normal tileSetsArray
       materialSetTexture cmat TU'Diffuse $ landMeshDetails landMesh
+      materialSetShaderParameter cmat "ChunkSize" (fromIntegral landscapeChunkSize :: Float)
       pure cmat
 
     loadChunk :: SharedPtr Material -> Ptr Node -> SharedPtr Texture2DArray -> V2 Int -> LandChunk -> IO LandMesh
@@ -70,7 +75,7 @@ loadLandscape app scene l@Landscape{..} = do
       let model = landMeshModel landMesh
           name = "LandChunk_" ++ show xi ++ "_" ++ show yi
       node <- nodeCreateChild landNode name CM'Local 0
-      let toPos v = fromIntegral (v * landscapeChunkSize) * landscapeTileScale
+      let toPos v = fromIntegral (v * (landscapeChunkSize + 1)) * landscapeTileScale
       nodeSetPosition node $ Vector3 (toPos xi) 0 (toPos yi)
       mobject <- nodeCreateComponent node Nothing Nothing
       case mobject of
@@ -99,3 +104,17 @@ landscapeHeightsFromFunction f land = land { landscapeChunks = M.mapWithKey updC
         chunkPoint = chunkOrigin + chunkSize * tileScale * fmap fromIntegral (V2 x y) / fmap fromIntegral (V2 width height)
         in f chunkPoint / landscapeVerticalScale land
       in chunk { landChunkHeightmap = updHeightmap $ landChunkHeightmap chunk}
+
+-- | Set all tiles in landscape from function. Coordinates passed in the function are tile indecies.
+-- Output value is tileset index.
+landscapeTilesFromFunction :: (V2 Int -> Word8) -> Landscape -> Landscape
+landscapeTilesFromFunction f land = land { landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land }
+  where
+  v2 v = V2 v v
+  chunkSize = v2 $ landscapeChunkSize land
+  updChunk chunkCoord chunk = chunk { landChunkTiles = updTiles $ landChunkTiles chunk}
+    where
+    chunkOrigin = chunkCoord * chunkSize
+    updTiles arr = runIdentity . R.computeP . R.traverse arr id $ \_ (R.Z R.:. y R.:. x) -> let
+      R.Z R.:. height R.:. _ = R.extent arr
+      in f $ chunkOrigin + V2 x y
