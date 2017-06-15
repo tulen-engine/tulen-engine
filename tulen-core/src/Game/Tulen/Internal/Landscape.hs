@@ -6,6 +6,7 @@ module Game.Tulen.Internal.Landscape(
   , landscapeHeightsFromFunction
   , landscapeTilesFromFunction
   , landscapeUpdateHeights
+  , landscapeAddCircleHeights
   , landscapeUpdateTiles
   , updateLoadedLandscape
   ) where
@@ -132,7 +133,7 @@ landscapeTilesFromFunction f land = land {
       R.Z R.:. height R.:. _ = R.extent arr
       in f $ chunkOrigin + V2 x y
 
--- | Set all heights in landscape from function. Coordinates passed in the function are world coordinates and
+-- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and
 -- outup height is in world units too.
 landscapeUpdateHeights :: V2 Int -- ^ Offset of region in tiles
   -> V2 Int -- ^ Size of region in tiles
@@ -146,8 +147,8 @@ landscapeUpdateHeights (V2 ox oy) (V2 sx sy) f land = land {
     chsize = landscapeChunkSize land
     ox' = ox `div` chsize
     oy' = oy `div` chsize
-    sx' = ceiling $ fromIntegral sx / (fromIntegral chsize :: Float)
-    sy' = ceiling $ fromIntegral sy / (fromIntegral chsize :: Float)
+    sx' = ((ox + abs sx) `div` chsize) - ox' + 1
+    sy' = ((oy + abs sy) `div` chsize) - oy' + 1
     v2 v = V2 v v
     chunkSize = fmap fromIntegral . v2 $ chsize
     tileScale =  v2 (landscapeTileScale land)
@@ -181,8 +182,8 @@ landscapeUpdateTiles (V2 ox oy) (V2 sx sy) f land = land {
     chsize = landscapeChunkSize land
     ox' = ox `div` chsize
     oy' = oy `div` chsize
-    sx' = ceiling $ fromIntegral sx / (fromIntegral chsize :: Float)
-    sy' = ceiling $ fromIntegral sy / (fromIntegral chsize :: Float)
+    sx' = ((ox + abs sx) `div` chsize) - ox' + 1
+    sy' = ((oy + abs sy) `div` chsize) - oy' + 1
     v2 v = V2 v v
     chunkSize = fmap fromIntegral . v2 $ chsize
     updChunk chunkCoord@(V2 chx chy) chunk
@@ -222,3 +223,20 @@ updateLoadedLandscape f ll@LoadedLandscape{..} = do
   pure ll {
       loadedLandDatum = land { landscapeUpdatedChunks = mempty }
     }
+
+-- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and
+-- outup height is in world units too.
+landscapeAddCircleHeights :: V2 Float -- ^ Center of circle (world units)
+  -> V2 Float -- ^ Size of circle (radius) world units
+  -> Float -- ^ Height in center
+  -> Landscape -> Landscape
+landscapeAddCircleHeights center size@(V2 sx sy) h l = landscapeUpdateHeights corner (2 * tileSize) f l
+  where
+    tsize = landscapeTileScale l
+    tileSize = fmap ceiling $ size / V2 tsize tsize
+    corner = fmap floor $ center - size
+    f p v = let
+      V2 x y = p - center
+      e2  = 1 - x^2 / sx^2 - y^2 / sy^2
+      v' = if e2 > 0 then h * sqrt e2 else 0
+      in v + v'

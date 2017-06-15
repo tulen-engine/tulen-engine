@@ -123,7 +123,7 @@ emptyLandscape (V2 sx sy) = Landscape {
   , landscapeUpdatedChunks = mempty
   }
   where
-    csize = 16
+    csize = 8
     hres = V2 1024 1024
 
 -- | Get empty land chunk (simple plain with no tiles)

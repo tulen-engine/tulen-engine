@@ -198,14 +198,14 @@ genHeightVertecies (V2 sx sy) tsize res vsize hm (mhmx, mhmy) = SV.fromList poin
 -- Warning: expoits the fact that x and y coordinates are ascending.
 calcBoundingBox :: SV.Vector VertWithNorm -> BoundingBox
 calcBoundingBox vs = if SV.null vs then BoundingBox 0 0
-  else BoundingBox (Vector3 minx minh miny) (Vector3 maxx maxh maxy)
+  else BoundingBox (Vector3 minx (minh-5) miny) (Vector3 maxx (maxh+5) maxy)
   where
     inf = 1 / 0
-    (minh, maxh) = SV.foldl' accMaxH (negate inf, inf) vs
+    (maxh, minh) = SV.foldl' accMaxH (negate inf, inf) vs
     accMaxH (!minv, !maxv) (VertWithNorm (V3 _ h _) _ _) = let
-      minv' = if minv < h then h else minv
-      maxv' = if maxv > h then h else maxv
-      in (minv', maxv')
+      maxv' = if maxv < h then h else maxv
+      minv' = if minv > h then h else minv
+      in (maxv', minv')
     VertWithNorm (V3 maxx _ maxy) _ _ = SV.last vs
     VertWithNorm (V3 minx _ miny) _ _ = SV.head vs
 
@@ -318,4 +318,5 @@ updateChunkMesh ch mneighbours LandMesh{..} = do
 
   let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
   updateDetailTexture tileNeighbours ch landMeshDetailsImg
+  traceShowM $ calcBoundingBox vertNorms
   modelSetBoundingBox landMeshModel $ calcBoundingBox vertNorms

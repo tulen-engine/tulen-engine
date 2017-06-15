@@ -192,7 +192,7 @@ createScene app = do
         , TileInfo "Textures/Barrens/Barrens_Rock.png"
         ]
       initHeights (V2 x y) = 1 + sin (0.002 * (x^2 + y^2))
-      landscape = landscapeTilesFromFunction initTiles $ landscapeHeightsFromFunction initHeights $ (emptyLandscape 5) {
+      landscape = landscapeTilesFromFunction initTiles $ landscapeHeightsFromFunction initHeights $ (emptyLandscape 10) {
           landscapeTiles  = tileSets
         , landscapeResolution = res
         }
@@ -289,7 +289,8 @@ handleUpdate app cameraNode camDataRef timeRef loadedLandRef e = do
   (input :: Ptr Input) <- guardJust "Input" =<< getSubsystem app
   whenM (inputGetKeyPress input KeySpace) $ do
     loadedLand <- readIORef loadedLandRef
-    writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeUpdateHeights 0 2 (const (+ 0.1))) loadedLand
+    writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeAddCircleHeights 15 7 0.1) loadedLand
+    -- writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeUpdateHeights 10 7 (const (+0.1))) loadedLand
 
   -- DEBUG END
 handlePostRenderUpdate :: SharedPtr Application -> IORef CameraData -> EventPostRenderUpdate -> IO ()
