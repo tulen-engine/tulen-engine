@@ -4,6 +4,7 @@ module Game.Tulen.Internal.Landscape.Types where
 import Control.Lens (view)
 import Data.Array.Repa (Array, U, DIM2, Z(..), (:.)(..))
 import Data.Map (Map)
+import Data.Set (Set)
 import Data.Vector (Vector)
 import Data.Vector.Unboxed (Unbox)
 import Data.Word
@@ -46,6 +47,8 @@ data Landscape = Landscape {
 , landscapeResolution    :: !Int
   -- | Size of the highest possible terrain point in world units
 , landscapeVerticalScale :: !Float
+  -- | Special runtime field to track updated chunks
+, landscapeUpdatedChunks :: !(Set (V2 Int))
 }
 
 -- | Get landscape positive direction bounds
@@ -67,6 +70,10 @@ landscapeLowBounds Landscape{..}
     minx = minimum $ view _x <$> coords
     miny = minimum $ view _y <$> coords
     in V2 minx miny
+
+-- | Get landscape low bound and high bound
+landscapeBounds :: Landscape -> (V2 Int, V2 Int)
+landscapeBounds l = (landscapeLowBounds l, landscapeHighBounds l)
 
 -- | Chunk of landscape
 data LandChunk = LandChunk {
@@ -113,6 +120,7 @@ emptyLandscape (V2 sx sy) = Landscape {
   , landscapeTileScale = 1
   , landscapeResolution = 30
   , landscapeVerticalScale = 1000
+  , landscapeUpdatedChunks = mempty
   }
   where
     csize = 16

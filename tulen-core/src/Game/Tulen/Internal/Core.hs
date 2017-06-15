@@ -3,10 +3,11 @@
 -- | Defines main context of engine that encapsulates all resources in one reference.
 module Game.Tulen.Internal.Core where
 
+import Control.Concurrent
 import Control.Lens ((^.))
 import Data.IORef
 import Data.StateVar
-import Foreign
+import Foreign hiding (void)
 import Graphics.Urho3D
 import Paths_tulen_core
 import System.Directory
@@ -102,9 +103,10 @@ coreStart coreRef = do
   core <- readIORef coreRef
   let app = coreApplication core
   initResources (coreConfig core) app
-  (scene, camera) <- createScene $ coreApplication core
+  (scene, camera, loadedLand) <- createScene $ coreApplication core
   setupViewport app scene camera
-  subscribeToEvents app camera
+  loadedLandRef <- newIORef loadedLand
+  subscribeToEvents app camera loadedLandRef
   initMouseMode core MM'Relative
   atomicWriteIORef coreRef $ core {
       coreScene  = scene
@@ -125,7 +127,7 @@ coreStop Core{..} = do
   engineDumpResources eng True
 
 -- | Construct the scene content.
-createScene :: SharedPtr Application -> IO (SharedPtr Scene, Ptr Node)
+createScene :: SharedPtr Application -> IO (SharedPtr Scene, Ptr Node, LoadedLandscape)
 createScene app = do
   context :: Ptr Context <- getContext app
   cache :: Ptr ResourceCache <- guardJust "Missing subsystem ResourceCache" =<< getSubsystem app
@@ -194,11 +196,11 @@ createScene app = do
           landscapeTiles  = tileSets
         , landscapeResolution = res
         }
-  loadLandscape app (parentPointer scene) landscape
+  loadedLand <- loadLandscape app (parentPointer scene) landscape
   -- END DEBUG
   --------
 
-  return (scene, cameraNode)
+  return (scene, cameraNode, loadedLand)
 
 -- | Set up a viewport for displaying the scene.
 setupViewport :: SharedPtr Application -> SharedPtr Scene -> Ptr Node -> IO ()
@@ -267,22 +269,29 @@ moveCamera app cameraNode t camData = do
     mul (Vector3 a b c) v = Vector3 (a*v) (b*v) (c*v)
 
 -- | Subscribe to application-wide logic update events.
-subscribeToEvents :: SharedPtr Application -> Ptr Node -> IO ()
-subscribeToEvents app cameraNode = do
+subscribeToEvents :: SharedPtr Application -> Ptr Node -> IORef LoadedLandscape -> IO ()
+subscribeToEvents app cameraNode loadedLandRef = do
   camDataRef <- newIORef $ CameraData 0 30 False
   timeRef <- newIORef 0
-  subscribeToEvent app $ handleUpdate app cameraNode camDataRef timeRef
+  subscribeToEvent app $ handleUpdate app cameraNode camDataRef timeRef loadedLandRef
   subscribeToEvent app $ handlePostRenderUpdate app camDataRef
 
 -- | Handle the logic update event.
-handleUpdate :: SharedPtr Application -> Ptr Node -> IORef CameraData -> IORef Float -> EventUpdate -> IO ()
-handleUpdate app cameraNode camDataRef timeRef e = do
+handleUpdate :: SharedPtr Application -> Ptr Node -> IORef CameraData -> IORef Float -> IORef LoadedLandscape -> EventUpdate -> IO ()
+handleUpdate app cameraNode camDataRef timeRef loadedLandRef e = do
   -- Take the frame time step, which is stored as a float
   let t = e ^. timeStep
   camData <- readIORef camDataRef
   -- Move the camera, scale movement with time step
   writeIORef camDataRef =<< moveCamera app cameraNode t camData
 
+  -- DEBUG
+  (input :: Ptr Input) <- guardJust "Input" =<< getSubsystem app
+  whenM (inputGetKeyPress input KeySpace) $ do
+    loadedLand <- readIORef loadedLandRef
+    writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeUpdateHeights 0 2 (const (+ 0.1))) loadedLand
+
+  -- DEBUG END
 handlePostRenderUpdate :: SharedPtr Application -> IORef CameraData -> EventPostRenderUpdate -> IO ()
 handlePostRenderUpdate app camDataRef _ = do
   camData <- readIORef camDataRef

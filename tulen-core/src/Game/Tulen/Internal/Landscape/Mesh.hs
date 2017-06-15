@@ -1,5 +1,4 @@
 -- | Mesh generation for landscape
-{-# LANGUAGE ViewPatterns #-}
 module Game.Tulen.Internal.Landscape.Mesh where
 
 import Data.Word
@@ -20,16 +19,27 @@ import Debug.Trace
 -- when original data chanes.
 data LandMesh = LandMesh {
   -- | Engine model
-  landMeshModel    :: !(SharedPtr Model)
+  landMeshModel      :: !(SharedPtr Model)
   -- | Buffer that holds vertecies
-, landMeshVertex   :: !(SharedPtr VertexBuffer)
+, landMeshVertex     :: !(SharedPtr VertexBuffer)
   -- | Index buffer that holds triangles
-, landMeshIndex    :: !(SharedPtr IndexBuffer)
+, landMeshIndex      :: !(SharedPtr IndexBuffer)
   -- | Accumulated geometry
-, landMeshGeometry :: !(SharedPtr Geometry)
+, landMeshGeometry   :: !(SharedPtr Geometry)
+  -- | Image with data, where which tile is located (rgba channels each
+  -- for corners of a quad).
+, landMeshDetailsImg :: !(SharedPtr Image)
   -- | Texture with data, where which tile is located (rgba channels each
   -- for corners of a quad).
-, landMeshDetails  :: !(SharedPtr Texture2D)
+, landMeshDetails    :: !(SharedPtr Texture2D)
+  -- | Size in tiles of mesh
+, landMeshSize       :: !(V2 Int)
+  -- | Size of tile in world units
+, landMeshTileSize   :: !Float
+  -- | Number of vertecies per tile
+, landMeshResolution :: !Int
+  -- | Vertical scale of heightmap
+, landMeshVScale     :: !Float
 }
 
 -- | Strict pair for vertex and normal and UV
@@ -276,11 +286,36 @@ makeLandMesh context chunkSize tsize res vscale mneighbours ch = do
   modelSetIndexBuffers model indexBuffers
 
   let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
-  tex <- makeDetailTexture context tileNeighbours ch
+  (img, tex) <- makeDetailTexture context tileNeighbours ch
   pure LandMesh {
-      landMeshModel    = model
-    , landMeshVertex   = vb
-    , landMeshIndex    = ib
-    , landMeshGeometry = geom
-    , landMeshDetails  = tex
+      landMeshModel      = model
+    , landMeshVertex     = vb
+    , landMeshIndex      = ib
+    , landMeshGeometry   = geom
+    , landMeshDetailsImg = img
+    , landMeshDetails    = tex
+    , landMeshSize       = chunkSize
+    , landMeshTileSize   = tsize
+    , landMeshResolution = res
+    , landMeshVScale     = vscale
     }
+
+-- | Update height of vertecies in buffers
+updateChunkMesh :: LandChunk -- ^ Where to get data about height from
+  -> (Maybe LandChunk, Maybe LandChunk, Maybe LandChunk) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> LandMesh -- ^ Buffers to update
+  -> IO ()
+updateChunkMesh ch mneighbours LandMesh{..} = do
+  let heightmapNeighbours = (\(x, y, _) -> (fmap landChunkHeightmap x, fmap landChunkHeightmap y)) mneighbours
+      vertNorms :: SV.Vector VertWithNorm = genHeightVertecies landMeshSize landMeshTileSize landMeshResolution landMeshVScale (landChunkHeightmap ch) heightmapNeighbours
+      numVertices = fromIntegral $ SV.length vertNorms
+
+  let elements = [ vertexElement Type'Vector3 SEM'Position
+                 , vertexElement Type'Vector3 SEM'Normal
+                 , vertexElement Type'Vector2 SEM'TexCoord ]
+  vertexBufferSetSize landMeshVertex numVertices elements False
+  _ <- SV.unsafeWith vertNorms $ vertexBufferSetData landMeshVertex . castPtr
+
+  let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
+  updateDetailTexture tileNeighbours ch landMeshDetailsImg
+  modelSetBoundingBox landMeshModel $ calcBoundingBox vertNorms

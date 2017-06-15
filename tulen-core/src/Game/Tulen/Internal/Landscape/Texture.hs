@@ -54,7 +54,7 @@ copyTilesToImage tm (mxm, mym, mxym) img = mapM_ writePixel is
 makeDetailTexture :: Ptr Context
   -> (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk
-  -> IO (SharedPtr Texture2D)
+  -> IO (SharedPtr Image, SharedPtr Texture2D)
 makeDetailTexture context mneighbours LandChunk{..} =  do
   -- create image
   img :: SharedPtr Image <- newSharedObject $ pointer context
@@ -71,7 +71,17 @@ makeDetailTexture context mneighbours LandChunk{..} =  do
   _ <- texture2DSetSize tex width height getRGBAFormat TextureDynamic 1 True
   _ <- texture2DSetDataFromImage tex img False
 
-  pure tex
+  pure (img, tex)
+
+-- | Generate texture for tile mapping of chunk
+updateDetailTexture :: (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> LandChunk
+  -> SharedPtr Image
+  -> IO ()
+updateDetailTexture mneighbours LandChunk{..} img = do
+  let R.Z R.:. height R.:. width = R.extent landChunkTiles
+  imageSetSize2D img width height 4
+  copyTilesToImage landChunkTiles mneighbours img
 
 -- | How much pixels to add into atlas to prevent edge bleeding
 atlasBleedingBorder :: Int
