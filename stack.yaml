@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-8.16
+resolver: lts-8.22
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -45,7 +45,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/Teaspot-Studio/Urho3D-Haskell.git
-    commit: 8ce26ba04a629bf32c04fadc1078033165229b70
+    commit: bd18129c2549ad3c303e1b14a76cb6287dfe6341
   subdirs:
     - '.'
     - 'urho3d-bindgen'
