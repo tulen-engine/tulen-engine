@@ -77,11 +77,14 @@ makeDetailTexture context mneighbours LandChunk{..} =  do
 updateDetailTexture :: (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk
   -> SharedPtr Image
+  -> SharedPtr Texture2D
   -> IO ()
-updateDetailTexture mneighbours LandChunk{..} img = do
+updateDetailTexture mneighbours LandChunk{..} img tex = do
   let R.Z R.:. height R.:. width = R.extent landChunkTiles
   imageSetSize2D img width height 4
   copyTilesToImage landChunkTiles mneighbours img
+  texture2DSetDataFromImage tex img False
+  pure ()
 
 -- | How much pixels to add into atlas to prevent edge bleeding
 atlasBleedingBorder :: Int

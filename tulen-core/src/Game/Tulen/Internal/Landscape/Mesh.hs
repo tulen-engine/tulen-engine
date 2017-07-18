@@ -317,6 +317,5 @@ updateChunkMesh ch mneighbours LandMesh{..} = do
   _ <- SV.unsafeWith vertNorms $ vertexBufferSetData landMeshVertex . castPtr
 
   let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
-  updateDetailTexture tileNeighbours ch landMeshDetailsImg
-  traceShowM $ calcBoundingBox vertNorms
+  updateDetailTexture tileNeighbours ch landMeshDetailsImg landMeshDetails
   modelSetBoundingBox landMeshModel $ calcBoundingBox vertNorms

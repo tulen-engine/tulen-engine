@@ -339,17 +339,20 @@ handlePostRenderUpdate app camDataRef _ = do
 
 handleMouseDown :: SharedPtr Application -> IORef LoadedLandscape -> Ptr Node -> MouseButtonDown -> IO ()
 handleMouseDown app loadedLandRef camNode MouseButtonDown{..}
-  | mouseButtonDownButton == mouseButtonLeft = do
-    camera :: Ptr Camera <- guardJust "Camera" =<< nodeGetComponent camNode True
-    mres <- cursorRaycastSingle app camera 250 -- hangs here
-    whenJust mres $ \RayQueryResult{..} -> do
-      loadedLand <- readIORef loadedLandRef
-      let Vector3 x _ z = _rayQueryResultPosition
-      writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeAddCircleHeights (V2 x z) 7 0.1) loadedLand
-      pure ()
-    pure ()
+  | mouseButtonDownButton == mouseButtonLeft = updateLand $ \x z -> landscapeUpdateTiles (round <$> V2 x z) 1 (\_ _ -> 3)
+  | mouseButtonDownButton == mouseButtonRight = updateLand $ \x z -> landscapeUpdateTiles (round <$> V2 x z) 1 (\_ _ -> 1)
   | otherwise = pure ()
-
+  where
+    updateLand f = do
+      camera :: Ptr Camera <- guardJust "Camera" =<< nodeGetComponent camNode True
+      mres <- cursorRaycastSingle app camera 250 -- hangs here
+      whenJust mres $ \RayQueryResult{..} -> do
+        loadedLand <- readIORef loadedLandRef
+        let Vector3 x _ z = _rayQueryResultPosition
+        -- writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeAddCircleHeights (V2 x z) 7 0.1) loadedLand
+        writeIORef loadedLandRef =<< updateLoadedLandscape (f x z) loadedLand
+        pure ()
+      pure ()
 -- | Change mouse visibility and behavior
 initMouseMode :: Core -> MouseMode -> IO ()
 initMouseMode core mode = do
