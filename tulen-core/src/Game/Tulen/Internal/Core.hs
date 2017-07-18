@@ -12,6 +12,9 @@ import Graphics.Urho3D
 import Paths_tulen_core
 import System.Directory
 
+import Game.Tulen.Internal.Camera
+import Game.Tulen.Internal.Utils
+
 -- DEBUG
 import Debug.Trace
 import Game.Tulen.Internal.Landscape
@@ -104,6 +107,7 @@ coreStart coreRef = do
   let app = coreApplication core
   initResources (coreConfig core) app
   (scene, camera, loadedLand) <- createScene $ coreApplication core
+  createUI app
   setupViewport app scene camera
   loadedLandRef <- newIORef loadedLand
   subscribeToEvents app camera loadedLandRef
@@ -223,10 +227,31 @@ data CameraData = CameraData {
 , camDebugGeometry :: Bool
 }
 
+-- | Create default UI
+createUI :: SharedPtr Application -> IO ()
+createUI app = do
+  cache :: Ptr ResourceCache <- guardJust "ResourceCache" =<< getSubsystem app
+  ui :: Ptr UI <- guardJust "UI" =<< getSubsystem app
+  roote <- uiRoot ui
+  context <- getContext app
+
+  -- Create a Cursor UI element because we want to be able to hide and show it at will. When hidden, the mouse cursor will
+  -- control the camera, and when visible, it will point the raycast target
+  style :: Ptr XMLFile <- guardJust "DefaultStyle.xml" =<< cacheGetResource cache "UI/DefaultStyle.xml" True
+  cursor :: SharedPtr Cursor <- newSharedObject context
+  uiElementSetStyleAuto cursor style
+  uiSetCursor ui $ pointer cursor
+  uiElementSetVisible cursor True
+
 -- | Read input and moves the camera.
 moveCamera :: SharedPtr Application -> Ptr Node -> Float -> CameraData -> IO CameraData
 moveCamera app cameraNode t camData = do
-  (ui :: Ptr UI) <- guardJust "UI" =<< getSubsystem app
+  -- Right mouse button controls mouse cursor visibility: hide when pressed
+  ui :: Ptr UI <- guardJust "UI" =<< getSubsystem app
+  input :: Ptr Input <- guardJust "Input" =<< getSubsystem app
+  cursor <- uiCursor ui
+  isRightPress <- inputGetMouseButtonDown input mouseButtonRight
+  uiElementSetVisible cursor $ not isRightPress
 
   -- Do not move if the UI has a focused element (the console)
   mFocusElem <- uiFocusElement ui
@@ -239,9 +264,16 @@ moveCamera app cameraNode t camData = do
     let mouseSensitivity = 0.1
 
     -- Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
-    mouseMove <- inputGetMouseMove input
-    let yaw = camYaw camData + mouseSensitivity * fromIntegral (mouseMove ^. x)
-    let pitch = clamp (-90) 90 $ camPitch camData + mouseSensitivity * fromIntegral (mouseMove ^. y)
+    isVisible <- uiElementIsVisible cursor
+    (yaw, pitch) <- if not isVisible then do
+        mouseMove <- inputGetMouseMove input
+        let yaw = camYaw camData + mouseSensitivity * fromIntegral (mouseMove ^. x)
+        let pitch = clamp (-90) 90 $ camPitch camData + mouseSensitivity * fromIntegral (mouseMove ^. y)
+
+        -- Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
+        nodeSetRotation cameraNode $ quaternionFromEuler pitch yaw 0
+        pure (yaw, pitch)
+      else pure (camYaw camData, camPitch camData)
 
     -- Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
     nodeSetRotation cameraNode $ quaternionFromEuler pitch yaw 0
@@ -275,6 +307,7 @@ subscribeToEvents app cameraNode loadedLandRef = do
   timeRef <- newIORef 0
   subscribeToEvent app $ handleUpdate app cameraNode camDataRef timeRef loadedLandRef
   subscribeToEvent app $ handlePostRenderUpdate app camDataRef
+  subscribeToEvent app $ handleMouseDown app loadedLandRef cameraNode
 
 -- | Handle the logic update event.
 handleUpdate :: SharedPtr Application -> Ptr Node -> IORef CameraData -> IORef Float -> IORef LoadedLandscape -> EventUpdate -> IO ()
@@ -304,6 +337,19 @@ handlePostRenderUpdate app camDataRef _ = do
   when (camDebugGeometry camData) $
     rendererDrawDebugGeometry renderer True
 
+handleMouseDown :: SharedPtr Application -> IORef LoadedLandscape -> Ptr Node -> MouseButtonDown -> IO ()
+handleMouseDown app loadedLandRef camNode MouseButtonDown{..}
+  | mouseButtonDownButton == mouseButtonLeft = do
+    camera :: Ptr Camera <- guardJust "Camera" =<< nodeGetComponent camNode True
+    mres <- cursorRaycastSingle app camera 250 -- hangs here
+    whenJust mres $ \RayQueryResult{..} -> do
+      loadedLand <- readIORef loadedLandRef
+      let Vector3 x _ z = _rayQueryResultPosition
+      writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeAddCircleHeights (V2 x z) 7 0.1) loadedLand
+      pure ()
+    pure ()
+  | otherwise = pure ()
+
 -- | Change mouse visibility and behavior
 initMouseMode :: Core -> MouseMode -> IO ()
 initMouseMode core mode = do
@@ -311,13 +357,3 @@ initMouseMode core mode = do
   input :: Ptr Input <- guardJust "Missing system InputSystem" =<< getSubsystem app
   when (mode == MM'Free) $ inputSetMouseVisible input True False
   when (mode /= MM'Absolute) $ inputSetMouseMode input mode False
-
--- | Fail with helpfull message when encounter 'Nothing'
-guardJust :: String -> Maybe a -> IO a
-guardJust msg Nothing = fail $ "Unrecoverable error! " ++ msg
-guardJust _ (Just a) = pure a
-
--- | Helper to run code when value is nothing
-whenNothing :: Monad m => Maybe a -> b -> m b -> m b
-whenNothing Nothing _ f = f
-whenNothing (Just _) a _ = return a
