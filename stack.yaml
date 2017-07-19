@@ -40,6 +40,14 @@ packages:
 - 'tulen-core'
 - 'tulen-demo'
 - location:
+    git: https://github.com/NCrashed/reflex-host.git
+    commit: ecc105447b6f79e914e36f85a1e461c6425db29a
+  extra-dep: true
+- location:
+    git: https://github.com/reflex-frp/reflex.git
+    commit: a1092192c61f3dec924a8e2686dfe3440681bab3
+  extra-dep: true
+- location:
     git: https://github.com/tulen-engine/tulen-script.git
     commit: 72636ba2988e147edbc6b76f9440a953c1b1f15c
   extra-dep: true
@@ -60,7 +68,12 @@ packages:
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+- aeson-1.2.1.0
+- prim-uniq-0.1.0.1
+- ref-tf-0.4.0.1
+- servant-0.11
+- servant-docs-0.10.0.1
 
 # Override default flag values for local packages and extra-deps
 flags: {}
