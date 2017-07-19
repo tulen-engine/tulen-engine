@@ -12,6 +12,7 @@ module Game.Tulen.Internal.Landscape(
   ) where
 
 import Control.Lens ((^.))
+import Data.Foldable (traverse_)
 import Data.Functor.Identity
 import Data.Map.Strict (Map)
 import Data.Maybe
@@ -98,10 +99,10 @@ loadLandscape app scene l@Landscape{..} = do
 landscapeHeightsFromFunction :: (V2 Float -> Float) -> Landscape -> Landscape
 landscapeHeightsFromFunction f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.fromList [V2 x y | x <- [lowx .. highx], y <- [lowy .. highy]]
+  , landscapeUpdatedChunks = S.singleton $ IntRect lowBoundX highBoundY highBoundX highBoundY
   }
   where
-    (V2 lowx lowy, V2 highx highy) = landscapeBounds land
+    (V2 lowBoundX lowBoundY, V2 highBoundX highBoundY) = landscapeBounds land
     v2 v = V2 v v
     chunkSize = fmap fromIntegral . v2 $ landscapeChunkSize land
     tileScale =  v2 (landscapeTileScale land)
@@ -120,10 +121,10 @@ landscapeHeightsFromFunction f land = land {
 landscapeTilesFromFunction :: (V2 Int -> Word8) -> Landscape -> Landscape
 landscapeTilesFromFunction f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.fromList [V2 x y | x <- [lowx .. highx], y <- [lowy .. highy]]
+  , landscapeUpdatedChunks = S.singleton $ IntRect lowBoundX highBoundY highBoundX highBoundY
   }
   where
-  (V2 lowx lowy, V2 highx highy) = landscapeBounds land
+  (V2 lowBoundX lowBoundY, V2 highBoundX highBoundY) = landscapeBounds land
   v2 v = V2 v v
   chunkSize = v2 $ landscapeChunkSize land
   updChunk chunkCoord chunk = chunk { landChunkTiles = updTiles $ landChunkTiles chunk}
@@ -141,7 +142,7 @@ landscapeUpdateHeights :: V2 Int -- ^ Offset of region in tiles
   -> Landscape -> Landscape
 landscapeUpdateHeights (V2 ox oy) (V2 sx sy) f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.fromList [V2 x y | x <- [ox' .. ox'+sx'-1], y <- [oy' .. oy'+sy'-1]]
+  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx) (oy+sy)) $ landscapeUpdatedChunks land
   }
   where
     chsize = landscapeChunkSize land
@@ -176,7 +177,7 @@ landscapeUpdateTiles :: V2 Int -- ^ Offset of region in tiles
   -> Landscape -> Landscape
 landscapeUpdateTiles (V2 ox oy) (V2 sx sy) f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.fromList [V2 x y | x <- [ox' .. ox'+sx'-1], y <- [oy' .. oy'+sy'-1]]
+  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx) (oy+sy)) $ landscapeUpdatedChunks land
   }
   where
     chsize = landscapeChunkSize land
@@ -203,8 +204,9 @@ landscapeUpdateTiles (V2 ox oy) (V2 sx sy) f land = land {
 landscapeUpdateChunk ::
      LoadedLandscape -- ^ Loaded data
   -> V2 Int -- ^ Chunk index
+  -> IntRect -- ^ Region of chunk to update
   -> IO ()
-landscapeUpdateChunk LoadedLandscape{..} pos = do
+landscapeUpdateChunk LoadedLandscape{..} pos _ = do
   let land = loadedLandDatum
       mchunk = M.lookup pos $ landscapeChunks land
       mmesh = M.lookup pos loadedLandChunks
@@ -220,10 +222,33 @@ updateLoadedLandscape :: (Landscape -> Landscape) -> LoadedLandscape -> IO Loade
 updateLoadedLandscape f ll= do
   let land = f $ loadedLandDatum ll
       ll' = ll { loadedLandDatum = land }
-  traverse (landscapeUpdateChunk ll') $ S.elems $ landscapeUpdatedChunks land
+      splitter :: IntRect -> [(V2 Int, IntRect)]
+      splitter = regionChunks $ fromIntegral $ landscapeChunkSize land
+      regions :: [(V2 Int, IntRect)]
+      regions = mconcat $ fmap splitter $ S.elems $ landscapeUpdatedChunks land
+  print regions
+  traverse_ (uncurry $ landscapeUpdateChunk ll') regions
   pure ll' {
       loadedLandDatum = (loadedLandDatum ll') { landscapeUpdatedChunks = mempty }
     }
+
+-- | Convert region to set of subregions splitted by chunks borders
+--
+-- Also adds minus direction chunks borders to avoid gaps on terrain update.
+regionChunks :: V2 Int -> IntRect -> [(V2 Int, IntRect)]
+regionChunks (V2 chunkWidth chunkHeight) (IntRect minx miny maxx maxy) = [(V2 x y, IntRect minx' miny' maxx' maxy')
+  | (x, minx', maxx') <- split minx maxx chunkWidth
+  , (y, miny', maxy') <- split miny maxy chunkHeight
+  ]
+  where
+    split :: Int -> Int -> Int -> [(Int, Int, Int)]
+    split minv maxv dv = gaphack ++ if minv `div` dv == maxv `div` dv
+      then [(minv `div` dv, minv `mod` dv, maxv `mod` dv)]
+      else startv : [(v, 0, dv-1) | v <- [minv `div` dv + 1 .. maxv `div` dv - 1] ] ++ [endv]
+      where
+        startv = (minv `div` dv, minv `mod` dv, dv-1)
+        endv = (maxv `div` dv, 0, maxv `mod` dv)
+        gaphack = [(minv `div` dv - 1, dv-1, dv-1)| minv `mod` dv == 0] 
 
 -- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and
 -- outup height is in world units too.

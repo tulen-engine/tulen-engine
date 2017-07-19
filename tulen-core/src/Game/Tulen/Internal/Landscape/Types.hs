@@ -8,6 +8,7 @@ import Data.Set (Set)
 import Data.Vector (Vector)
 import Data.Vector.Unboxed (Unbox)
 import Data.Word
+import Graphics.Urho3D.Math
 import Linear
 
 import qualified Data.Array.Repa as R
@@ -47,8 +48,9 @@ data Landscape = Landscape {
 , landscapeResolution    :: !Int
   -- | Size of the highest possible terrain point in world units
 , landscapeVerticalScale :: !Float
-  -- | Special runtime field to track updated chunks
-, landscapeUpdatedChunks :: !(Set (V2 Int))
+  -- | Special runtime field to track dirty regions of landscape that need
+  -- regeneration.
+, landscapeUpdatedChunks :: !(Set IntRect)
 }
 
 -- | Get landscape positive direction bounds

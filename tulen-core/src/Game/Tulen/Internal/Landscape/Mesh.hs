@@ -3,8 +3,9 @@ module Game.Tulen.Internal.Landscape.Mesh where
 
 import Data.Word
 import Foreign
-import Game.Tulen.Internal.Landscape.Types
 import Game.Tulen.Internal.Landscape.Texture
+import Game.Tulen.Internal.Landscape.Types
+import GHC.Generics
 import Graphics.Urho3D
 import Linear
 
@@ -86,6 +87,18 @@ biflerp x y x1 x2 y1 y2 p11 p12 p21 p22 = flerp y y1 y2 fxy1 fxy2
   where
     fxy1 = flerp x x1 x2 p11 p21
     fxy2 = flerp x x1 x2 p12 p22
+
+-- | Collects possible flat neighbours of chunk
+data Neighbours a = Neighbours {
+  neighbourTopRight    :: !(Maybe a)
+, neighbourTop         :: !(Maybe a)
+, neighbourTopLeft     :: !(Maybe a)
+, neighbourRight       :: !(Maybe a)
+, neighbourLeft        :: !(Maybe a)
+, neighbourBottomRight :: !(Maybe a)
+, neighbourBottom      :: !(Maybe a)
+, neighbourBottomLeft  :: !(Maybe a)
+} deriving (Generic, Show, Functor)
 
 -- | Generate vertex-normal array for landscape chunk based on heightmap
 genHeightVertecies :: V2 Int -- ^ Size in tiles
