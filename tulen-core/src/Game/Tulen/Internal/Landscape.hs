@@ -217,11 +217,12 @@ landscapeUpdateChunk LoadedLandscape{..} pos = do
 
 -- | Update loaded landscape and sync changes with engine resources
 updateLoadedLandscape :: (Landscape -> Landscape) -> LoadedLandscape -> IO LoadedLandscape
-updateLoadedLandscape f ll@LoadedLandscape{..} = do
-  let land = f loadedLandDatum
-  traverse (landscapeUpdateChunk ll) $ S.elems $ landscapeUpdatedChunks land
-  pure ll {
-      loadedLandDatum = land { landscapeUpdatedChunks = mempty }
+updateLoadedLandscape f ll= do
+  let land = f $ loadedLandDatum ll
+      ll' = ll { loadedLandDatum = land }
+  traverse (landscapeUpdateChunk ll') $ S.elems $ landscapeUpdatedChunks land
+  pure ll' {
+      loadedLandDatum = (loadedLandDatum ll') { landscapeUpdatedChunks = mempty }
     }
 
 -- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and

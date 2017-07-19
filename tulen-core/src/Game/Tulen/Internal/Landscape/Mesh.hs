@@ -313,7 +313,7 @@ updateChunkMesh ch mneighbours LandMesh{..} = do
   let elements = [ vertexElement Type'Vector3 SEM'Position
                  , vertexElement Type'Vector3 SEM'Normal
                  , vertexElement Type'Vector2 SEM'TexCoord ]
-  vertexBufferSetSize landMeshVertex numVertices elements False
+  vertexBufferSetSize landMeshVertex numVertices elements True
   _ <- SV.unsafeWith vertNorms $ vertexBufferSetData landMeshVertex . castPtr
 
   let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
