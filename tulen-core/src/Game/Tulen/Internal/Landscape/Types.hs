@@ -8,7 +8,8 @@ import Data.Set (Set)
 import Data.Vector (Vector)
 import Data.Vector.Unboxed (Unbox)
 import Data.Word
-import Graphics.Urho3D.Math
+import Foreign
+import Graphics.Urho3D
 import Linear
 
 import qualified Data.Array.Repa as R
@@ -149,3 +150,41 @@ emptyLandChunk (V2 xs ys) pos (V2 hxs hys) = LandChunk {
     hmap = R.computeS $ R.fromFunction (Z :. hys :. hxs) (const 0)
     emptyArr :: Unbox a => a -> Array U DIM2 a
     emptyArr v = R.computeS $ R.fromFunction (Z :. ys :. xs) (const v)
+
+-- | Landscape alongside with all objects that were generated for rendering
+data LoadedLandscape = LoadedLandscape {
+  -- | The original data of landscape, when this changes, need regenerate engine
+  -- derivitives.
+  loadedLandDatum  :: !Landscape
+  -- | Root scene node for landscape, all chunks are connected to it.
+, loadedLandNode   :: !(Ptr Node)
+  -- | Runtime data that you need to upgrade after modifying original landscape data.
+, loadedLandChunks :: !(Map (V2 Int) LandMesh)
+}
+
+-- | Holds all data for landscape mesh. Should be regenerated (or updated)
+-- when original data chanes.
+data LandMesh = LandMesh {
+  -- | Engine model
+  landMeshModel      :: !(SharedPtr Model)
+  -- | Buffer that holds vertecies
+, landMeshVertex     :: !(SharedPtr VertexBuffer)
+  -- | Index buffer that holds triangles
+, landMeshIndex      :: !(SharedPtr IndexBuffer)
+  -- | Accumulated geometry
+, landMeshGeometry   :: !(SharedPtr Geometry)
+  -- | Image with data, where which tile is located (rgba channels each
+  -- for corners of a quad).
+, landMeshDetailsImg :: !(SharedPtr Image)
+  -- | Texture with data, where which tile is located (rgba channels each
+  -- for corners of a quad).
+, landMeshDetails    :: !(SharedPtr Texture2D)
+  -- | Size in tiles of mesh
+, landMeshSize       :: !(V2 Int)
+  -- | Size of tile in world units
+, landMeshTileSize   :: !Float
+  -- | Number of vertecies per tile
+, landMeshResolution :: !Int
+  -- | Vertical scale of heightmap
+, landMeshVScale     :: !Float
+}

@@ -10,8 +10,8 @@ import GHC.Generics
 import Reflex
 
 -- | Possible mouse buttons that you can track
-data MouseButton = LeftButton | RightButton | MiddleButton | ExtraButton !Int
-  deriving (Generic, Eq, Ord, Show, Read)
+data MouseButton = LeftButton | RightButton | MiddleButton | ExtraButton1 | ExtraButton2
+  deriving (Generic, Eq, Ord, Enum, Bounded, Show, Read)
 
 -- | Operations with mouse input
 class Monad m => MouseMonad t m where

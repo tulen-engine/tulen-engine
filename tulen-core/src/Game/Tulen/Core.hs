@@ -5,6 +5,10 @@ module Game.Tulen.Core(
   , CoreConfig(..)
   , defaultCoreConfig
   , runCore
+  , TulenM
   ) where
 
-import Game.Tulen.Internal.Core 
+import Game.Tulen.Internal.API
+import Game.Tulen.Internal.Core
+import Game.Tulen.Internal.Core.Types
+import Game.Tulen.Internal.Monad 

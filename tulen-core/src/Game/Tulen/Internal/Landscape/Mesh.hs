@@ -1,6 +1,7 @@
 -- | Mesh generation for landscape
 module Game.Tulen.Internal.Landscape.Mesh where
 
+import Control.Monad.Reader
 import Data.Word
 import Foreign
 import Game.Tulen.Internal.Landscape.Texture
@@ -9,39 +10,12 @@ import GHC.Generics
 import Graphics.Urho3D
 import Linear
 
+import Game.Tulen.Internal.Core.Types
+
 import qualified Data.Array.Repa as R
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
-
-import Debug.Trace
-
--- | Holds all data for landscape mesh. Should be regenerated (or updated)
--- when original data chanes.
-data LandMesh = LandMesh {
-  -- | Engine model
-  landMeshModel      :: !(SharedPtr Model)
-  -- | Buffer that holds vertecies
-, landMeshVertex     :: !(SharedPtr VertexBuffer)
-  -- | Index buffer that holds triangles
-, landMeshIndex      :: !(SharedPtr IndexBuffer)
-  -- | Accumulated geometry
-, landMeshGeometry   :: !(SharedPtr Geometry)
-  -- | Image with data, where which tile is located (rgba channels each
-  -- for corners of a quad).
-, landMeshDetailsImg :: !(SharedPtr Image)
-  -- | Texture with data, where which tile is located (rgba channels each
-  -- for corners of a quad).
-, landMeshDetails    :: !(SharedPtr Texture2D)
-  -- | Size in tiles of mesh
-, landMeshSize       :: !(V2 Int)
-  -- | Size of tile in world units
-, landMeshTileSize   :: !Float
-  -- | Number of vertecies per tile
-, landMeshResolution :: !Int
-  -- | Vertical scale of heightmap
-, landMeshVScale     :: !Float
-}
 
 -- | Strict pair for vertex and normal and UV
 data VertWithNorm = VertWithNorm !(V3 Float) !(V3 Float) !(V2 Float)
@@ -248,15 +222,16 @@ genTriangleIndecies (V2 sx sy) tsize res vsize hm = SV.fromList points
       in [i1, i2, i3, i4, i5, i6]
 
 -- | Generate new land mesh from given chunk description
-makeLandMesh :: Ptr Context -- ^ Urho context
-  -> V2 Int -- ^ Size in tiles of chunk
+makeLandMesh :: (MonadIO m, MonadReader Core m)
+  => V2 Int -- ^ Size in tiles of chunk
   -> Float -- ^ Size of single tile
   -> Int -- ^ Resolution (count of vertecies per tile)
   -> Float -- ^ Vertical scale of heightmap
   -> (Maybe LandChunk, Maybe LandChunk, Maybe LandChunk) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk -- ^ chunk
-  -> IO LandMesh
-makeLandMesh context chunkSize tsize res vscale mneighbours ch = do
+  -> m LandMesh
+makeLandMesh chunkSize tsize res vscale mneighbours ch = do
+  context <- getContext =<< asks coreApplication
   let heightmapNeighbours = (\(x, y, _) -> (fmap landChunkHeightmap x, fmap landChunkHeightmap y)) mneighbours
       vertNorms :: SV.Vector VertWithNorm = genHeightVertecies chunkSize tsize res vscale (landChunkHeightmap ch) heightmapNeighbours
       numVertices = fromIntegral $ SV.length vertNorms
@@ -275,11 +250,11 @@ makeLandMesh context chunkSize tsize res vscale mneighbours ch = do
                  , vertexElement Type'Vector3 SEM'Normal
                  , vertexElement Type'Vector2 SEM'TexCoord ]
   vertexBufferSetSize vb numVertices elements False
-  _ <- SV.unsafeWith vertNorms $ vertexBufferSetData vb . castPtr
+  _ <- liftIO $ SV.unsafeWith vertNorms $ vertexBufferSetData vb . castPtr
 
   indexBufferSetShadowed ib True
   indexBufferSetSize ib numIndecies True False
-  _ <- SV.unsafeWith indexData $ indexBufferSetData ib . castPtr
+  _ <- liftIO $ SV.unsafeWith indexData $ indexBufferSetData ib . castPtr
 
   geometrySetVertexBuffer geom 0 (pointer vb)
   geometrySetIndexBuffer geom (pointer ib)
@@ -299,7 +274,7 @@ makeLandMesh context chunkSize tsize res vscale mneighbours ch = do
   modelSetIndexBuffers model indexBuffers
 
   let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
-  (img, tex) <- makeDetailTexture context tileNeighbours ch
+  (img, tex) <- makeDetailTexture tileNeighbours ch
   pure LandMesh {
       landMeshModel      = model
     , landMeshVertex     = vb

@@ -4,6 +4,7 @@
 module Game.Tulen.Internal.Core where
 
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Lens ((^.))
 import Data.IORef
 import Data.StateVar
@@ -13,6 +14,7 @@ import Paths_tulen_core
 import System.Directory
 
 import Game.Tulen.Internal.Camera
+import Game.Tulen.Internal.ExternalRef
 import Game.Tulen.Internal.Utils
 
 -- DEBUG
@@ -23,64 +25,44 @@ import qualified Data.Array.Repa as R
 import qualified Data.Map.Strict as M
 -- end DEBUG
 
--- | Main context of engine. Here goes all referencies to internal resources.
--- Core is used as entry point for game.
-data Core = Core {
-  coreApplication :: SharedPtr Application
-, coreScene       :: SharedPtr Scene
-, coreCamera      :: Ptr Node
-, coreConfig      :: CoreConfig
-}
+import Game.Tulen.Internal.Core.Types
+import Game.Tulen.Internal.Monad
 
--- | Additional runtime configuration of engine core.
-data CoreConfig = CoreConfig {
-  -- | Created window title
-  coreWindowTitle :: String
-  -- | Log file name relative to current folder. Nothing means no log.
-, coreLogFile     :: Maybe String
-  -- | Path to resource folder. For Nothing, try to guess.
-, coreResources   :: Maybe FilePath
-  -- | User can provide additional action for engine setup stage.
-, coreCustomSetup :: Maybe (Core -> IO ())
-  -- | User can provide additional action for engine startup stage.
-, coreCustomStart :: Maybe (Core -> IO ())
--- | User can provide additional action for engine stop stage.
-, coreCustomStop  :: Maybe (Core -> IO ())
-}
-
--- | Neutral configuration that doesn't affect behavior of engine
-defaultCoreConfig :: CoreConfig
-defaultCoreConfig = CoreConfig {
-    coreWindowTitle = "Tulen engine"
-  , coreLogFile = Nothing
-  , coreResources = Nothing
-  , coreCustomSetup = Nothing
-  , coreCustomStart = Nothing
-  , coreCustomStop = Nothing
-  }
-
--- | Execute game with custom initialisation action.
+-- | Execute game with custom initialisation action. Blocks until exit.
 runCore :: CoreConfig -- ^ Hooks and values that allow to configure engine.
+  -> TulenM () -- ^ Reactive network to execute
   -> IO ()
-runCore cfg@CoreConfig{..} = withObject () $ \context -> do
+runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
   rec
     let withCore f = readIORef coreRef >>= f
     app <- newSharedObject (context
       , withCore (coreSetup cfg) >> maybe (pure ()) withCore coreCustomSetup
-      , coreStart coreRef >> maybe (pure ()) withCore coreCustomStart
+      , coreStart m coreRef >> maybe (pure ()) withCore coreCustomStart
       , withCore coreStop >> maybe (pure ()) withCore coreCustomStop)
+    camerasVar <- newTVarIO (mempty, 0)
+    landVar <- newTVarIO Nothing
     coreRef <- newIORef Core {
         coreApplication = app
-      , coreScene = undefined -- initialized at coreStart
-      , coreCamera = undefined
+      , coreScene = error "Scene not initialized at startup"
+      , coreCameras = camerasVar
+      , coreActiveCamera = error "Camera variable is accessible only inside reactive monad"
       , coreConfig = cfg
+      , coreUI = error "UI not initialized at startup"
+      , coreInput = error "Input not initialized at startup"
+      , coreResourceCache = error "ResourceCache not initialized at startup"
+      , coreFileSystem = error "FileSystem not initialized at startup"
+      , coreOctree = error "Octree not initialized at startup"
+      , coreGraphics = error "Graphics not initialized at startup"
+      , coreCursor = error "Cursor not initalized at startup"
+      , coreRenderer = error "Renderer not initialized at startup"
+      , coreLandscape = landVar
       }
   applicationRun app
 
 -- | Try to guess resource dir with core assets
-getResourceDir :: Maybe FilePath -> IO FilePath
+getResourceDir :: MonadIO m => Maybe FilePath -> m FilePath
 getResourceDir (Just p) = pure p
-getResourceDir Nothing = do
+getResourceDir Nothing = liftIO $ do
   p <- getDataFileName "Data"
   exists <- doesDirectoryExist p
   pure $ if not exists then "./Data" else p
@@ -101,26 +83,61 @@ coreSetup CoreConfig{..} core = do
   startupParameter app "Sound" $= False -- TODO: remove this
 
 -- | Internal core run steps
-coreStart :: IORef Core -> IO ()
-coreStart coreRef = do
+coreStart :: TulenM () -> IORef Core -> IO ()
+coreStart m coreRef = do
   core <- readIORef coreRef
   let app = coreApplication core
-  initResources (coreConfig core) app
-  (scene, camera, loadedLand) <- createScene $ coreApplication core
-  createUI app
-  setupViewport app scene camera
-  loadedLandRef <- newIORef loadedLand
-  subscribeToEvents app camera loadedLandRef
-  initMouseMode core MM'Relative
-  atomicWriteIORef coreRef $ core {
-      coreScene  = scene
-    , coreCamera = camera
+  ui <- guardJust "UI" =<< getSubsystem app
+  input <- guardJust "Input" =<< getSubsystem app
+  fileSystem <- guardJust "FileSystem" =<< getSubsystem app
+  cache <- guardJust "ResourceCache" =<< getSubsystem app
+  graphics <- guardJust "Graphics" =<< getSubsystem app
+  renderer <- guardJust "Renderer" =<< getSubsystem app
+  let coreWithSystems1 = core {
+      coreUI = ui
+    , coreInput = input
+    , coreResourceCache = cache
+    , coreFileSystem = fileSystem
+    , coreGraphics = graphics
+    , coreRenderer = renderer
     }
+  atomicWriteIORef coreRef coreWithSystems1
 
-initResources :: CoreConfig -> SharedPtr Application -> IO ()
-initResources CoreConfig{..} app = do
+  (loadedLand, scene, cid) <- flip runReaderT coreWithSystems1 $ do
+    initResources (coreConfig core)
+    (scene, cid, loadedLand) <- createScene
+    octree <- guardJust "Octree" =<< nodeGetComponent scene True
+    local (\c -> c { coreScene = scene, coreOctree = octree }) $ do
+      createUI
+      cursor <- guardJust "Cursor" . wrapNullPtr =<< uiCursor ui
+      local (\c -> c { coreCursor = cursor }) $ do
+        setupViewport cid
+        subscribeToEvents cid
+        initMouseMode MM'Relative
+        pure (loadedLand, scene, cid)
+
+  atomically . writeTVar (coreLandscape core) $ Just loadedLand
+
+  octree <- guardJust "Octree" =<< nodeGetComponent scene True
+  cursor <- guardJust "Cursor" . wrapNullPtr =<< uiCursor ui
+  let coreWithSystems2 = coreWithSystems1 {
+      coreScene = scene
+    , coreOctree = octree
+    , coreCursor = cursor
+    }
+  atomicWriteIORef coreRef coreWithSystems2
+  _ <- forkOS $ runTulenM coreWithSystems2 $ do
+    camVar <- newExternalRef cid
+    local (\c -> c {
+        coreActiveCamera = camVar
+      }) m
+  pure ()
+
+initResources :: (MonadReader Core m, MonadIO m) => CoreConfig -> m ()
+initResources CoreConfig{..} = do
+  app <- asks coreApplication
+  cache <- asks coreResourceCache
   path <- getResourceDir coreResources
-  cache :: Ptr ResourceCache <- guardJust "ResourceCache" =<< getSubsystem app
   _ <- cacheAddResourceDir cache path priorityLast
   pure ()
 
@@ -131,10 +148,11 @@ coreStop Core{..} = do
   engineDumpResources eng True
 
 -- | Construct the scene content.
-createScene :: SharedPtr Application -> IO (SharedPtr Scene, Ptr Node, LoadedLandscape)
-createScene app = do
-  context :: Ptr Context <- getContext app
-  cache :: Ptr ResourceCache <- guardJust "Missing subsystem ResourceCache" =<< getSubsystem app
+createScene :: (MonadReader Core m, MonadIO m) => m (SharedPtr Scene, CameraId, LoadedLandscape)
+createScene = do
+  app <- asks coreApplication
+  context <- getContext app
+  cache <- asks coreResourceCache
   scene :: SharedPtr Scene <- newSharedObject context
 
   {-
@@ -166,8 +184,8 @@ createScene app = do
   -- bring the far clip plane closer for more effective culling of distant objects
   cameraNode <- nodeCreateChild scene "Camera" CM'Local 0
   nodeSetPosition cameraNode (Vector3 2 2 2)
-  cam :: Ptr Camera <- guardJust "Failed to create Camera" =<< nodeCreateComponent cameraNode Nothing Nothing
-  cameraSetFarClip cam 300
+  camera <- guardJust "Failed to create camera" =<< newCamera cameraNode
+  cameraSetFarClip (cameraPtr camera) 300
 
   --------
   -- DEBUG
@@ -200,40 +218,37 @@ createScene app = do
           landscapeTiles  = tileSets
         , landscapeResolution = res
         }
-  loadedLand <- loadLandscape app (parentPointer scene) landscape
+  loadedLand <- loadLandscape (parentPointer scene) landscape
   -- END DEBUG
   --------
 
-  return (scene, cameraNode, loadedLand)
+  return (scene, cameraId camera, loadedLand)
 
 -- | Set up a viewport for displaying the scene.
-setupViewport :: SharedPtr Application -> SharedPtr Scene -> Ptr Node -> IO ()
-setupViewport app scene cameraNode = do
-  (renderer :: Ptr Renderer) <- guardJust "Renderer" =<< getSubsystem app
+setupViewport :: (MonadIO m, MonadReader Core m) => CameraId -> m ()
+setupViewport cid = do
+  renderer <- asks coreRenderer
 
   {-
     Set up a viewport to the Renderer subsystem so that the 3D scene can be seen. We need to define the scene and the camera
     at minimum. Additionally we could configure the viewport screen size and the rendering path (eg. forward / deferred) to
     use, but now we just use full screen and default render path configured in the engine command line options
   -}
-  cntx <- getContext app
-  (cam :: Ptr Camera) <- guardJust "Camera" =<< nodeGetComponent cameraNode False
-  (viewport :: SharedPtr Viewport) <- newSharedObject (cntx, pointer scene, cam)
-  rendererSetViewport renderer 0 viewport
+  cntx <- getContext =<< asks coreApplication
+  void . withCamera cid $ \CameraData{..} -> do
+    scene <- asks coreScene
+    cnts <- getContext =<< asks coreApplication
+    (viewport :: SharedPtr Viewport) <- newSharedObject (cntx, pointer scene, cameraPtr)
+    rendererSetViewport renderer 0 viewport
 
-data CameraData = CameraData {
-  camYaw :: Float
-, camPitch :: Float
-, camDebugGeometry :: Bool
-}
 
 -- | Create default UI
-createUI :: SharedPtr Application -> IO ()
-createUI app = do
-  cache :: Ptr ResourceCache <- guardJust "ResourceCache" =<< getSubsystem app
-  ui :: Ptr UI <- guardJust "UI" =<< getSubsystem app
+createUI :: (MonadIO m, MonadReader Core m) => m ()
+createUI = do
+  cache <- asks coreResourceCache
+  ui <- asks coreUI
   roote <- uiRoot ui
-  context <- getContext app
+  context <- getContext =<< asks coreApplication
 
   -- Create a Cursor UI element because we want to be able to hide and show it at will. When hidden, the mouse cursor will
   -- control the camera, and when visible, it will point the raycast target
@@ -243,120 +258,34 @@ createUI app = do
   uiSetCursor ui $ pointer cursor
   uiElementSetVisible cursor True
 
--- | Read input and moves the camera.
-moveCamera :: SharedPtr Application -> Ptr Node -> Float -> CameraData -> IO CameraData
-moveCamera app cameraNode t camData = do
-  -- Right mouse button controls mouse cursor visibility: hide when pressed
-  ui :: Ptr UI <- guardJust "UI" =<< getSubsystem app
-  input :: Ptr Input <- guardJust "Input" =<< getSubsystem app
-  cursor <- uiCursor ui
-  isRightPress <- inputGetMouseButtonDown input mouseButtonRight
-  uiElementSetVisible cursor $ not isRightPress
-
-  -- Do not move if the UI has a focused element (the console)
-  mFocusElem <- uiFocusElement ui
-  whenNothing mFocusElem camData $ do
-    (input :: Ptr Input) <- guardJust "Input" =<< getSubsystem app
-
-    -- Movement speed as world units per second
-    let moveSpeed = 20
-    -- Mouse sensitivity as degrees per pixel
-    let mouseSensitivity = 0.1
-
-    -- Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
-    isVisible <- uiElementIsVisible cursor
-    (yaw, pitch) <- if not isVisible then do
-        mouseMove <- inputGetMouseMove input
-        let yaw = camYaw camData + mouseSensitivity * fromIntegral (mouseMove ^. x)
-        let pitch = clamp (-90) 90 $ camPitch camData + mouseSensitivity * fromIntegral (mouseMove ^. y)
-
-        -- Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
-        nodeSetRotation cameraNode $ quaternionFromEuler pitch yaw 0
-        pure (yaw, pitch)
-      else pure (camYaw camData, camPitch camData)
-
-    -- Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
-    nodeSetRotation cameraNode $ quaternionFromEuler pitch yaw 0
-
-    -- Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
-    -- Use the Translate() function (default local space) to move relative to the node's orientation.
-    whenM (inputGetKeyDown input KeyW) $
-      nodeTranslate cameraNode (vec3Forward `mul` (moveSpeed * t)) TS'Local
-    whenM (inputGetKeyDown input KeyS) $
-      nodeTranslate cameraNode (vec3Back `mul` (moveSpeed * t)) TS'Local
-    whenM (inputGetKeyDown input KeyA) $
-      nodeTranslate cameraNode (vec3Left `mul` (moveSpeed * t)) TS'Local
-    whenM (inputGetKeyDown input KeyD) $
-      nodeTranslate cameraNode (vec3Right `mul` (moveSpeed * t)) TS'Local
-
-    -- Toggle debug geometry with space
-    spacePressed <- inputGetKeyPress input KeySpace
-
-    return camData {
-        camYaw = yaw
-      , camPitch = pitch
-      , camDebugGeometry = (if spacePressed then not else id) $ camDebugGeometry camData
-      }
-  where
-    mul (Vector3 a b c) v = Vector3 (a*v) (b*v) (c*v)
-
 -- | Subscribe to application-wide logic update events.
-subscribeToEvents :: SharedPtr Application -> Ptr Node -> IORef LoadedLandscape -> IO ()
-subscribeToEvents app cameraNode loadedLandRef = do
-  camDataRef <- newIORef $ CameraData 0 30 False
-  timeRef <- newIORef 0
-  subscribeToEvent app $ handleUpdate app cameraNode camDataRef timeRef loadedLandRef
-  subscribeToEvent app $ handlePostRenderUpdate app camDataRef
-  subscribeToEvent app $ handleMouseDown app loadedLandRef cameraNode
+subscribeToEvents :: (MonadIO m, MonadReader Core m) => CameraId -> m ()
+subscribeToEvents cid = do
+  app <- asks coreApplication
+  core <- ask
+  subscribeToEvent app $ flip runReaderT core . handleUpdate cid
+  subscribeToEvent app $ flip runReaderT core . handlePostRenderUpdate cid
 
 -- | Handle the logic update event.
-handleUpdate :: SharedPtr Application -> Ptr Node -> IORef CameraData -> IORef Float -> IORef LoadedLandscape -> EventUpdate -> IO ()
-handleUpdate app cameraNode camDataRef timeRef loadedLandRef e = do
+handleUpdate :: (MonadIO m, MonadReader Core m) => CameraId -> EventUpdate -> m ()
+handleUpdate cid e = do
   -- Take the frame time step, which is stored as a float
   let t = e ^. timeStep
-  camData <- readIORef camDataRef
   -- Move the camera, scale movement with time step
-  writeIORef camDataRef =<< moveCamera app cameraNode t camData
+  updateCamera cid $ moveCamera t
 
-  -- DEBUG
-  (input :: Ptr Input) <- guardJust "Input" =<< getSubsystem app
-  whenM (inputGetKeyPress input KeySpace) $ do
-    loadedLand <- readIORef loadedLandRef
-    writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeAddCircleHeights 15 7 0.1) loadedLand
-    -- writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeUpdateHeights 10 7 (const (+0.1))) loadedLand
-
-  -- DEBUG END
-handlePostRenderUpdate :: SharedPtr Application -> IORef CameraData -> EventPostRenderUpdate -> IO ()
-handlePostRenderUpdate app camDataRef _ = do
-  camData <- readIORef camDataRef
-  (renderer :: Ptr Renderer) <- guardJust "Renderer" =<< getSubsystem app
-
+handlePostRenderUpdate :: (MonadIO m, MonadReader Core m) => CameraId ->  EventPostRenderUpdate -> m ()
+handlePostRenderUpdate cid _ =
   -- If draw debug mode is enabled, draw viewport debug geometry, which will show eg. drawable bounding boxes and skeleton
   -- bones. Note that debug geometry has to be separately requested each frame. This time use depth test, as otherwise the result becomes
   -- hard to interpret due to large object count
-  when (camDebugGeometry camData) $
-    rendererDrawDebugGeometry renderer True
+  void $ withCamera cid $ \camData -> do
+    renderer <- asks coreRenderer
+    when (cameraDebugGeometry camData) $ rendererDrawDebugGeometry renderer True
 
-handleMouseDown :: SharedPtr Application -> IORef LoadedLandscape -> Ptr Node -> MouseButtonDown -> IO ()
-handleMouseDown app loadedLandRef camNode MouseButtonDown{..}
-  | mouseButtonDownButton == mouseButtonLeft = updateLand $ \x z -> landscapeUpdateTiles (round <$> V2 x z) 1 (\_ _ -> 3)
-  -- | mouseButtonDownButton == mouseButtonRight = updateLand $ \x z -> landscapeUpdateTiles (round <$> V2 x z) 1 (\_ _ -> 1)
-  | otherwise = pure ()
-  where
-    updateLand f = do
-      camera :: Ptr Camera <- guardJust "Camera" =<< nodeGetComponent camNode True
-      mres <- cursorRaycastSingle app camera 250
-      whenJust mres $ \RayQueryResult{..} -> do
-        loadedLand <- readIORef loadedLandRef
-        let Vector3 x _ z = _rayQueryResultPosition
-        -- writeIORef loadedLandRef =<< updateLoadedLandscape (landscapeAddCircleHeights (V2 x z) 7 0.1) loadedLand
-        writeIORef loadedLandRef =<< updateLoadedLandscape (f x z) loadedLand
-        pure ()
-      pure ()
 -- | Change mouse visibility and behavior
-initMouseMode :: Core -> MouseMode -> IO ()
-initMouseMode core mode = do
-  let app = coreApplication core
-  input :: Ptr Input <- guardJust "Missing system InputSystem" =<< getSubsystem app
+initMouseMode :: (MonadIO m, MonadReader Core m) => MouseMode -> m ()
+initMouseMode mode = do
+  input <- asks coreInput
   when (mode == MM'Free) $ inputSetMouseVisible input True False
   when (mode /= MM'Absolute) $ inputSetMouseMode input mode False

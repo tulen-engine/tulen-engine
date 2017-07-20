@@ -5,4 +5,7 @@ module Game.Tulen.Demo(
 import Game.Tulen.Core
 
 runDemo :: IO ()
-runDemo = runCore defaultCoreConfig
+runDemo = runCore defaultCoreConfig makeReactiveAp
+
+makeReactiveAp :: TulenM ()
+makeReactiveAp = pure ()

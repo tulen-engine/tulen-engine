@@ -6,6 +6,7 @@ module Game.Tulen.API(
   , module Game.Tulen.API.Mouse
   , module Game.Tulen.API.Resource
   -- * Reexports of control primitives
+  , Reflex(..)
   , MonadAppHost
   , AppInfo
   , AppHost

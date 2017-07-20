@@ -12,6 +12,7 @@ module Game.Tulen.Internal.Landscape(
   ) where
 
 import Control.Lens ((^.))
+import Control.Monad.Reader
 import Data.Foldable (traverse_)
 import Data.Functor.Identity
 import Data.Map.Strict (Map)
@@ -21,6 +22,7 @@ import Foreign
 import Graphics.Urho3D
 import Linear
 
+import Game.Tulen.Internal.Core.Types
 import Game.Tulen.Internal.Landscape.Mesh as X
 import Game.Tulen.Internal.Landscape.Texture as X
 import Game.Tulen.Internal.Landscape.Types as X
@@ -29,31 +31,20 @@ import qualified Data.Array.Repa as R
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
--- | Landscape alongside with all objects that were generated for rendering
-data LoadedLandscape = LoadedLandscape {
-  -- | The original data of landscape, when this changes, need regenerate engine
-  -- derivitives.
-  loadedLandDatum  :: !Landscape
-  -- | Root scene node for landscape, all chunks are connected to it.
-, loadedLandNode   :: !(Ptr Node)
-  -- | Runtime data that you need to upgrade after modifying original landscape data.
-, loadedLandChunks :: !(Map (V2 Int) LandMesh)
-}
-
 -- | Create landscape from description and attach it to scene.
-loadLandscape :: SharedPtr Application -- ^ Application reference
-  -> Ptr Node -- ^ Scene or other node to attach landscape to
+loadLandscape :: forall m . (MonadIO m, MonadReader Core m)
+  => Ptr Node -- ^ Scene or other node to attach landscape to
   -> Landscape -- ^ Landscape data
-  -> IO LoadedLandscape
-loadLandscape app scene l@Landscape{..} = do
-  putStrLn "Making material..."
-  matTemplate <- makeLandscapeMaterial app
-  putStrLn "Making atlases..."
-  tileSetsArray <- makeTilesTexture app landscapeTiles
-  putStrLn "Making chunks..."
+  -> m LoadedLandscape
+loadLandscape scene l@Landscape{..} = do
+  liftIO . putStrLn $ "Making material..."
+  matTemplate <- makeLandscapeMaterial
+  liftIO . putStrLn $ "Making atlases..."
+  tileSetsArray <- makeTilesTexture landscapeTiles
+  liftIO . putStrLn $ "Making chunks..."
   landNode <- nodeCreateChild scene "Landscape" CM'Local 0
   landMeshes <- sequence $ M.mapWithKey (loadChunk matTemplate landNode tileSetsArray) landscapeChunks
-  putStrLn "Done."
+  liftIO . putStrLn $ "Done."
   pure LoadedLandscape {
       loadedLandDatum = l { landscapeUpdatedChunks = mempty }
     , loadedLandNode = landNode
@@ -63,7 +54,7 @@ loadLandscape app scene l@Landscape{..} = do
     makeMaterial matTemplate landMesh tileSetsArray = do
       -- cmat <- materialClone matTemplate ""
       -- TODO: check why previous line doesn't work at all
-      Just (cache :: Ptr ResourceCache) <- getSubsystem app
+      cache <- asks coreResourceCache
       Just (cmat' :: Ptr Material) <- cacheGetResource cache "Materials/Landscape.xml" True
       cmat <- materialClone cmat' ""
       materialSetTexture cmat TU'Normal tileSetsArray
@@ -71,14 +62,14 @@ loadLandscape app scene l@Landscape{..} = do
       materialSetShaderParameter cmat "ChunkSize" (fromIntegral landscapeChunkSize :: Float)
       pure cmat
 
-    loadChunk :: SharedPtr Material -> Ptr Node -> SharedPtr Texture2DArray -> V2 Int -> LandChunk -> IO LandMesh
+    loadChunk :: SharedPtr Material -> Ptr Node -> SharedPtr Texture2DArray -> V2 Int -> LandChunk -> m LandMesh
     loadChunk matTemplate landNode tileSetsArray (V2 xi yi) chunk = do
-      context <- getContext app
+      context <- getContext =<< asks coreApplication
       let xneigh  = M.lookup (V2 (xi+1) yi) landscapeChunks
           yneigh  = M.lookup (V2 xi (yi+1)) landscapeChunks
           xyneigh = M.lookup (V2 (xi+1) (yi+1)) landscapeChunks
           mneighbours = (xneigh, yneigh, xyneigh)
-      landMesh <- makeLandMesh context (V2 landscapeChunkSize landscapeChunkSize) landscapeTileScale landscapeResolution landscapeVerticalScale mneighbours chunk
+      landMesh <- makeLandMesh (V2 landscapeChunkSize landscapeChunkSize) landscapeTileScale landscapeResolution landscapeVerticalScale mneighbours chunk
       let model = landMeshModel landMesh
           name = "LandChunk_" ++ show xi ++ "_" ++ show yi
       node <- nodeCreateChild landNode name CM'Local 0
@@ -248,7 +239,7 @@ regionChunks (V2 chunkWidth chunkHeight) (IntRect minx miny maxx maxy) = [(V2 x 
       where
         startv = (minv `div` dv, minv `mod` dv, dv-1)
         endv = (maxv `div` dv, 0, maxv `mod` dv)
-        gaphack = [(minv `div` dv - 1, dv-1, dv-1)| minv `mod` dv == 0] 
+        gaphack = [(minv `div` dv - 1, dv-1, dv-1)| minv `mod` dv == 0]
 
 -- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and
 -- outup height is in world units too.

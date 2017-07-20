@@ -2,13 +2,15 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Tulen.Internal.Landscape.Texture where
 
+import Control.Monad.Reader
+import Data.Array.Repa (Z(..), (:.)(..))
 import Data.Word
 import Foreign
+import Game.Tulen.Internal.Core.Types
 import Game.Tulen.Internal.Image
 import Game.Tulen.Internal.Landscape.Types
 import Graphics.Urho3D
 import Linear
-import Data.Array.Repa (Z(..), (:.)(..))
 
 import qualified Data.Array.Repa as R
 import qualified Data.Foldable as F
@@ -51,18 +53,19 @@ copyTilesToImage tm (mxm, mym, mxym) img = mapM_ writePixel is
       imageSetPixel2D img x (height - 1 - y) $ Color c0 c1 c2 c3
 
 -- | Generate texture for tile mapping of chunk
-makeDetailTexture :: Ptr Context
-  -> (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+makeDetailTexture :: (MonadIO m, MonadReader Core m)
+  => (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk
-  -> IO (SharedPtr Image, SharedPtr Texture2D)
-makeDetailTexture context mneighbours LandChunk{..} =  do
+  -> m (SharedPtr Image, SharedPtr Texture2D)
+makeDetailTexture mneighbours LandChunk{..} =  do
+  context <- getContext =<< asks coreApplication
   -- create image
   img :: SharedPtr Image <- newSharedObject $ pointer context
   let R.Z R.:. height R.:. width = R.extent landChunkTiles
   imageSetSize2D img width height 4
 
   -- fill with data from tilemap
-  copyTilesToImage landChunkTiles mneighbours img
+  liftIO $ copyTilesToImage landChunkTiles mneighbours img
 
   -- create texture
   tex :: SharedPtr Texture2D <- newSharedObject $ pointer context
@@ -74,15 +77,16 @@ makeDetailTexture context mneighbours LandChunk{..} =  do
   pure (img, tex)
 
 -- | Generate texture for tile mapping of chunk
-updateDetailTexture :: (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+updateDetailTexture :: MonadIO m
+  => (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandChunk
   -> SharedPtr Image
   -> SharedPtr Texture2D
-  -> IO ()
+  -> m ()
 updateDetailTexture mneighbours LandChunk{..} img tex = do
   let R.Z R.:. height R.:. width = R.extent landChunkTiles
   imageSetSize2D img width height 4
-  copyTilesToImage landChunkTiles mneighbours img
+  liftIO $ copyTilesToImage landChunkTiles mneighbours img
   texture2DSetDataFromImage tex img False
   pure ()
 
@@ -147,11 +151,12 @@ copyTilesWithBorder src = F.foldlM blit
       (V2 atlasTileSize atlasTileSize) (V2 atlasBleedingBorder atlasBleedingBorder)
 
 -- | Generate texture array for tilesets
-makeTilesTexture :: SharedPtr Application
-  -> V.Vector TileInfo
-  -> IO (SharedPtr Texture2DArray)
-makeTilesTexture app tileInfos = do
-  context <- getContext app
+makeTilesTexture :: (MonadIO m, MonadReader Core m)
+  => V.Vector TileInfo
+  -> m (SharedPtr Texture2DArray)
+makeTilesTexture tileInfos = do
+  context <- getContext =<< asks coreApplication
+  cache <- asks coreResourceCache
   tex :: SharedPtr Texture2DArray <- newSharedObject context
   let layersCount = fromIntegral $ length tileInfos
       V2 texWidth texHeight = atlasSizePixelsWithBorder
@@ -159,11 +164,10 @@ makeTilesTexture app tileInfos = do
   textureSetFilterMode tex FilterNearestAnisotropic
   textureSetAddressMode tex CoordU AddressClamp
   textureSetAddressMode tex CoordV AddressClamp
-  mapM_ (loadLayer tex) $ V.indexed tileInfos
+  liftIO $ mapM_ (loadLayer cache tex) $ V.indexed tileInfos
   pure tex
   where
-    loadLayer tex (i, TileInfo{..}) = do
-      Just (cache :: Ptr ResourceCache) <- getSubsystem app
+    loadLayer cache tex (i, TileInfo{..}) = do
       mtex <- cacheGetResource cache tileResource True
       case mtex of
         Nothing -> fail $ "Failed to load tileset texture " ++ tileResource -- TODO: proper error handling
@@ -189,10 +193,10 @@ landscapeTechniqueName :: String
 landscapeTechniqueName = "Techniques/LandscapeBlend.xml"
 
 -- | Create landscape material that can be cloned between different chunks.
-makeLandscapeMaterial :: SharedPtr Application -> IO (SharedPtr Material)
-makeLandscapeMaterial app = do
-  context <- getContext app
-  Just (cache :: Ptr ResourceCache) <- getSubsystem app
+makeLandscapeMaterial :: (MonadIO m, MonadReader Core m) => m (SharedPtr Material)
+makeLandscapeMaterial = do
+  context <- getContext =<< asks coreApplication
+  cache <- asks coreResourceCache
   mtech <- cacheGetResource cache landscapeTechniqueName True
   case mtech of
     Nothing -> fail $ "Failed to load technique for landscape " ++ landscapeTechniqueName -- TODO: error handling
