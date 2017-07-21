@@ -9,6 +9,9 @@ module Game.Tulen.Internal.Landscape(
   , landscapeAddCircleHeights
   , landscapeUpdateTiles
   , updateLoadedLandscape
+  , landscapeGetTile
+  , landscapeGetTileVariance
+  , landscapeGetHeight
   ) where
 
 import Control.Lens ((^.))
@@ -257,3 +260,47 @@ landscapeAddCircleHeights center size@(V2 sx sy) h l = landscapeUpdateHeights co
       e2  = 1 - x^2 / sx^2 - y^2 / sy^2
       v' = if e2 > 0 then h * sqrt e2 else 0
       in v + v'
+
+-- | Get current tile in landscape
+landscapeGetTile :: Landscape -- ^ land data
+  -> V2 Int -- ^ Position
+  -> Word8 -- ^ TileId
+landscapeGetTile land (V2 px py) = case M.lookup (V2 chx chy) $ landscapeChunks land of
+  Nothing -> 0
+  Just chunk -> R.index (landChunkTiles chunk) (R.ix2 y' x')
+  where
+    chunkSize = landscapeChunkSize land
+    chx = px `div` chunkSize
+    chy = py `div` chunkSize
+    x' = px `mod` chunkSize
+    y' = py `mod` chunkSize
+
+-- | Get current tile in landscape
+landscapeGetTileVariance :: Landscape -- ^ land data
+  -> V2 Int -- ^ Position
+  -> Word8 -- ^ Variance id
+landscapeGetTileVariance land (V2 px py) = case M.lookup (V2 chx chy) $ landscapeChunks land of
+  Nothing -> 0
+  Just chunk -> R.index (landChunkTilesVar chunk) (R.ix2 y' x')
+  where
+    chunkSize = landscapeChunkSize land
+    chx = px `div` chunkSize
+    chy = py `div` chunkSize
+    x' = px `mod` chunkSize
+    y' = py `mod` chunkSize
+
+-- | Get current tile in landscape
+landscapeGetHeight :: Landscape -- ^ land data
+  -> V2 Float -- ^ Position
+  -> Float -- ^ Height value
+landscapeGetHeight land (V2 px py) = case M.lookup (V2 chx chy) $ landscapeChunks land of
+  Nothing -> 0
+  Just chunk -> R.index (landChunkHeightmap chunk) (R.ix2 y' x')
+    where
+      R.Z R.:. hh R.:. hw = R.extent $ landChunkHeightmap chunk
+      x' = floor $ fromIntegral hw * px / fromIntegral chunkSize
+      y' = floor $ fromIntegral hh * py / fromIntegral chunkSize
+  where
+    chunkSize = landscapeChunkSize land
+    chx = floor px `div` chunkSize
+    chy = floor py `div` chunkSize

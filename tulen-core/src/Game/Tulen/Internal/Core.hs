@@ -40,7 +40,6 @@ runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
       , coreStart m coreRef >> maybe (pure ()) withCore coreCustomStart
       , withCore coreStop >> maybe (pure ()) withCore coreCustomStop)
     camerasVar <- newTVarIO (mempty, 0)
-    landVar <- newTVarIO Nothing
     coreRef <- newIORef Core {
         coreApplication = app
       , coreScene = error "Scene not initialized at startup"
@@ -55,7 +54,7 @@ runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
       , coreGraphics = error "Graphics not initialized at startup"
       , coreCursor = error "Cursor not initalized at startup"
       , coreRenderer = error "Renderer not initialized at startup"
-      , coreLandscape = landVar
+      , coreLandscape = error "Landscape variable is accessible only inside reactive monad"
       }
   applicationRun app
 
@@ -116,8 +115,6 @@ coreStart m coreRef = do
         initMouseMode MM'Relative
         pure (loadedLand, scene, cid)
 
-  atomically . writeTVar (coreLandscape core) $ Just loadedLand
-
   octree <- guardJust "Octree" =<< nodeGetComponent scene True
   cursor <- guardJust "Cursor" . wrapNullPtr =<< uiCursor ui
   let coreWithSystems2 = coreWithSystems1 {
@@ -128,8 +125,10 @@ coreStart m coreRef = do
   atomicWriteIORef coreRef coreWithSystems2
   _ <- forkOS $ runTulenM coreWithSystems2 $ do
     camVar <- newExternalRef cid
+    landVar <- newExternalRef loadedLand
     local (\c -> c {
         coreActiveCamera = camVar
+      , coreLandscape = landVar
       }) m
   pure ()
 

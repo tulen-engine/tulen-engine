@@ -29,6 +29,7 @@ library
     Game.Tulen.Internal.API
     Game.Tulen.Internal.API.Camera
     Game.Tulen.Internal.API.Helpers
+    Game.Tulen.Internal.API.Landscape
     Game.Tulen.Internal.API.Math
     Game.Tulen.Internal.API.Mouse
     Game.Tulen.Internal.Camera

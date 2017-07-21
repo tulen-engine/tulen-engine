@@ -30,7 +30,7 @@ data Core = Core {
 , coreGraphics      :: Ptr Graphics
 , coreCursor        :: Ptr Cursor
 , coreRenderer      :: Ptr Renderer
-, coreLandscape     :: TVar (Maybe LoadedLandscape) -- ^ TODO: replace with loaded map reference
+, coreLandscape     :: ExternalRef Spider LoadedLandscape -- ^ TODO: replace with loaded map reference
 }
 
 -- | Additional runtime configuration of engine core.
