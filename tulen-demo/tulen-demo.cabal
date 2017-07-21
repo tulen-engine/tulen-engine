@@ -19,8 +19,12 @@ library
     Game.Tulen.Demo
   build-depends:
       base             >= 4.7     && < 5
+    , tulen-api        >= 0.1     && < 0.2
     , tulen-core       >= 0.1     && < 0.2
   default-language:    Haskell2010
+  default-extensions:
+    RecordWildCards
+    OverloadedStrings
 
 executable tulen-demo
   hs-source-dirs:      app

@@ -14,6 +14,6 @@ data MouseButton = LeftButton | RightButton | MiddleButton | ExtraButton1 | Extr
   deriving (Generic, Eq, Ord, Enum, Bounded, Show, Read)
 
 -- | Operations with mouse input
-class Monad m => MouseMonad t m where
+class Monad m => MouseMonad t m | m -> t where
   -- | Notify when given mouse button is clicked, return window space point.
   onMouseClick :: MouseButton -> m (Event t ViewPoint)

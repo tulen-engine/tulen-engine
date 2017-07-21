@@ -25,7 +25,7 @@ data HitPoint = HitPoint {
 } deriving (Show, Generic)
 
 -- | API for manipulating player camera
-class Monad m => CameraMonad t m where
+class Monad m => CameraMonad t m | m -> t where
   -- | Camera object reference
   type Camera t m :: *
 

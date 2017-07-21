@@ -2,12 +2,15 @@ module Game.Tulen.Internal.API.Landscape(
 
   ) where
 
+import Control.Concurrent
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Game.Tulen.Internal.API.Helpers
 import Game.Tulen.Internal.ExternalRef
 import Game.Tulen.Internal.Landscape
 import Game.Tulen.Internal.Monad
+import Graphics.Urho3D.Multithread
 import Linear
 import qualified Game.Tulen.API.Landscape as API
 import qualified Game.Tulen.API.Math as API
@@ -34,9 +37,13 @@ instance API.LandscapeMonad Spider TulenM where
 
   tileSetter e = do
     core <- ask
-    performEvent $ ffor e $ \(API.V2 x y, API.TileId n) -> flip runReaderT core $
+    performEventAsync $ ffor e $ \(API.V2 x y, API.TileId n) -> flip runReaderT core $
       modifyExternalRefM (coreLandscape core) $ \land -> do
         let oldTile = landscapeGetTile (loadedLandDatum land) (V2 x y)
-        land' <- liftIO $ updateLoadedLandscape (landscapeUpdateTiles (V2 x y) 1 (const $ const $ fromIntegral n)) land
+        landVar <- liftIO newEmptyMVar
+        runInMainThread $ do
+          land' <- updateLoadedLandscape (landscapeUpdateTiles (V2 x y) 1 (const $ const $ fromIntegral n)) land
+          putMVar landVar land'
+        land' <- liftIO $ readMVar landVar
         pure (land', API.TileId $ fromIntegral oldTile)
   {-# INLINE tileSetter #-}

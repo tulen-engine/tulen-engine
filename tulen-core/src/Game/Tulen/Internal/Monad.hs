@@ -9,6 +9,7 @@ module Game.Tulen.Internal.Monad(
   , HostFrame
   , module Reflex
   , newExternalEvent
+  , performEventAsync
   , performEventAndTrigger_
   , performEvent_
   , performEvent
@@ -29,7 +30,7 @@ import Control.Monad.State.Strict
 import Control.Monad.Trans.RSS.Strict
 import Control.Monad.Writer
 import Data.Semigroup.Applicative
-import Reflex hiding (performEvent_, performEvent, getPostBuild)
+import Reflex hiding (performEvent_, performEventAsync, performEvent, getPostBuild)
 import Reflex.Host.App
 import Reflex.Host.App.Internal
 import Reflex.Host.Class

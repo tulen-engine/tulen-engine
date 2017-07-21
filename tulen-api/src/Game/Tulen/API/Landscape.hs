@@ -33,7 +33,7 @@ data TileInfo = TileInfo {
 } deriving (Eq, Ord, Show, Read, Generic)
 
 -- | API for manipulation with landscape
-class Monad m => LandscapeMonad t m where
+class Monad m => LandscapeMonad t m | m -> t where
   -- | Get name to tile id mapping for available tilesets
   tileset :: m (Dynamic t [TileInfo])
 
