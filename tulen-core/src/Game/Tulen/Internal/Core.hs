@@ -10,6 +10,7 @@ import Data.IORef
 import Data.StateVar
 import Foreign hiding (void)
 import Graphics.Urho3D
+import Graphics.Urho3D.Multithread
 import Paths_tulen_core
 import System.Directory
 
@@ -40,6 +41,7 @@ runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
       , coreStart m coreRef >> maybe (pure ()) withCore coreCustomStart
       , withCore coreStop >> maybe (pure ()) withCore coreCustomStop)
     camerasVar <- newTVarIO (mempty, 0)
+    landChan <- newTChanIO
     coreRef <- newIORef Core {
         coreApplication = app
       , coreScene = error "Scene not initialized at startup"
@@ -55,6 +57,7 @@ runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
       , coreCursor = error "Cursor not initalized at startup"
       , coreRenderer = error "Renderer not initialized at startup"
       , coreLandscape = error "Landscape variable is accessible only inside reactive monad"
+      , coreLandscapeChan = landChan
       }
   applicationRun app
 
@@ -126,6 +129,13 @@ coreStart m coreRef = do
   _ <- forkOS $ runTulenM coreWithSystems2 $ do
     camVar <- newExternalRef cid
     landVar <- newExternalRef loadedLand
+    -- start thread that aply land patches
+    _ <- liftIO . forkIO . forever $ do
+      (landPatch, patchNotify) <- atomically . readTChan $ coreLandscapeChan coreWithSystems2
+      runInMainThread $ do
+        modifyExternalRefM landVar $ fmap (, ()) . updateLoadedLandscape landPatch
+        patchNotify
+    -- execute user reactive network
     local (\c -> c {
         coreActiveCamera = camVar
       , coreLandscape = landVar

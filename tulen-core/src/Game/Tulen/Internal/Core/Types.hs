@@ -31,6 +31,7 @@ data Core = Core {
 , coreCursor        :: Ptr Cursor
 , coreRenderer      :: Ptr Renderer
 , coreLandscape     :: ExternalRef Spider LoadedLandscape -- ^ TODO: replace with loaded map reference
+, coreLandscapeChan :: TChan (Landscape -> Landscape, IO ()) -- ^ Queue of landscape changes, IO action notifies sender that land is patched
 }
 
 -- | Additional runtime configuration of engine core.

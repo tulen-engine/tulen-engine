@@ -3,9 +3,11 @@ module Game.Tulen.Internal.API.Landscape(
   ) where
 
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+import Control.Monad.STM
 import Game.Tulen.Internal.API.Helpers
 import Game.Tulen.Internal.ExternalRef
 import Game.Tulen.Internal.Landscape
@@ -37,13 +39,13 @@ instance API.LandscapeMonad Spider TulenM where
 
   tileSetter e = do
     core <- ask
-    performEventAsync $ ffor e $ \(API.V2 x y, API.TileId n) -> flip runReaderT core $
-      modifyExternalRefM (coreLandscape core) $ \land -> do
-        let oldTile = landscapeGetTile (loadedLandDatum land) (V2 x y)
-        landVar <- liftIO newEmptyMVar
-        runInMainThread $ do
-          land' <- updateLoadedLandscape (landscapeUpdateTiles (V2 x y) 1 (const $ const $ fromIntegral n)) land
-          putMVar landVar land'
-        land' <- liftIO $ readMVar landVar
-        pure (land', API.TileId $ fromIntegral oldTile)
+    performEventAsync $ ffor e $ \(API.V2 x y, API.TileId n) -> do
+      land <- readExternalRef $ coreLandscape core
+      let oldTile = landscapeGetTile (loadedLandDatum land) (V2 x y)
+      notifyVar <- liftIO newEmptyMVar
+      let patchLand = landscapeUpdateTiles (V2 x y) 1 (const $ const $ fromIntegral n)
+          notify = putMVar notifyVar ()
+      atomically $ writeTChan (coreLandscapeChan core) (patchLand, notify)
+      takeMVar notifyVar
+      pure $ API.TileId $ fromIntegral oldTile
   {-# INLINE tileSetter #-}
