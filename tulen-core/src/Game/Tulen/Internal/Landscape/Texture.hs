@@ -18,8 +18,6 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 
-import Debug.Trace
-
 -- | Copy all tiles to image, encodes corners of quad in each of RGBA channels.
 copyTilesToImage :: Tilemap -- ^ Original tilemap
   -> (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions

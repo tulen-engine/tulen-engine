@@ -20,7 +20,6 @@ import Data.Foldable (traverse_)
 import Data.Functor.Identity
 import Data.Map.Strict (Map)
 import Data.Maybe
-import Debug.Trace
 import Foreign
 import Graphics.Urho3D
 import Linear
@@ -220,7 +219,6 @@ updateLoadedLandscape f ll= do
       splitter = regionChunks $ fromIntegral $ landscapeChunkSize land
       regions :: [(V2 Int, IntRect)]
       regions = mconcat $ fmap splitter $ S.elems $ landscapeUpdatedChunks land
-  print regions
   traverse_ (uncurry $ landscapeUpdateChunk ll') regions
   pure ll' {
       loadedLandDatum = (loadedLandDatum ll') { landscapeUpdatedChunks = mempty }
