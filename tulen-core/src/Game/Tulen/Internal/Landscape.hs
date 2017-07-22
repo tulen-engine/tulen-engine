@@ -33,6 +33,8 @@ import qualified Data.Array.Repa as R
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
+import Debug.Trace
+
 -- | Create landscape from description and attach it to scene.
 loadLandscape :: forall m . (MonadIO m, MonadReader Core m)
   => Ptr Node -- ^ Scene or other node to attach landscape to
@@ -241,7 +243,9 @@ regionChunks (V2 chunkWidth chunkHeight) (IntRect minx miny maxx maxy) = [(V2 x 
       where
         startv = (minv `div` dv, minv `mod` dv, dv-1)
         endv = (maxv `div` dv, 0, maxv `mod` dv)
-        gaphack = [(minv `div` dv - 1, dv-1, dv-1)| minv `mod` dv == 0]
+        gaphack =
+             [(minv `div` dv - 1, dv-1, dv-1)| minv `mod` dv == 0]
+          ++ [(maxv `div` dv + 1, 0, 0)| (maxv+1) `mod` dv == 0]
 
 -- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and
 -- outup height is in world units too.
