@@ -21,13 +21,18 @@ import qualified Data.Vector.Unboxed as UV
 -- | Copy all tiles to image, encodes corners of quad in each of RGBA channels.
 copyTilesToImage :: Tilemap -- ^ Original tilemap
   -> (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
+  -> IntRect -- ^ Region of tilemap to copy
   -> SharedPtr Image -- ^ Where to pack data
   -> IO ()
-copyTilesToImage tm (mxm, mym, mxym) img = mapM_ writePixel is
+copyTilesToImage tm (mxm, mym, mxym) (IntRect minx miny maxx maxy) img = mapM_ writePixel is
   where
     R.Z R.:. height R.:. width = R.extent tm
+    minx' = max 0 minx
+    miny' = max 0 miny
+    maxx' = min (width-1) maxx
+    maxy' = min (height-1) maxy
     is :: [(Int, Int)]
-    is = (,) <$> [0 .. height - 1] <*> [0 .. width - 1]
+    is = (,) <$> [miny' .. maxy'] <*> [minx' .. maxx']
 
     lookupTilemap :: Tilemap -> Int -> Int -> Word8
     lookupTilemap m x y = R.toUnboxed m UV.! R.toIndex (R.extent m) (R.Z R.:. y R.:. x)
@@ -42,7 +47,7 @@ copyTilesToImage tm (mxm, mym, mxym) img = mapM_ writePixel is
       | x >= width || y >= height = 0
       | otherwise = lookupTilemap tm x y
 
-    writePixel (x, y) = do
+    writePixel (y, x) = do
       let toFloat v = (fromIntegral v + 0.01) / 256
           c0 = toFloat $ lookupTilemap tm x y
           c1 = toFloat $ nlookup (x+1) y
@@ -63,7 +68,7 @@ makeDetailTexture mneighbours LandChunk{..} =  do
   imageSetSize2D img width height 4
 
   -- fill with data from tilemap
-  liftIO $ copyTilesToImage landChunkTiles mneighbours img
+  liftIO $ copyTilesToImage landChunkTiles mneighbours (IntRect 0 0 width height) img
 
   -- create texture
   tex :: SharedPtr Texture2D <- newSharedObject $ pointer context
@@ -77,14 +82,19 @@ makeDetailTexture mneighbours LandChunk{..} =  do
 -- | Generate texture for tile mapping of chunk
 updateDetailTexture :: MonadIO m
   => (Maybe Tilemap, Maybe Tilemap, Maybe Tilemap) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
-  -> LandChunk
-  -> SharedPtr Image
-  -> SharedPtr Texture2D
+  -> LandChunk -- ^ Chunk that contains new data
+  -> IntRect -- ^ Region to update
+  -> SharedPtr Image -- ^ Loaded image data
+  -> SharedPtr Texture2D -- ^ Where to store final image data
   -> m ()
-updateDetailTexture mneighbours LandChunk{..} img tex = do
+updateDetailTexture mneighbours LandChunk{..} (IntRect minx miny maxx maxy) img tex = do
   let R.Z R.:. height R.:. width = R.extent landChunkTiles
   imageSetSize2D img width height 4
-  liftIO $ copyTilesToImage landChunkTiles mneighbours img
+  let minx' = max 0 (minx-1)
+      miny' = max 0 (miny-1)
+      maxx' = min (width-1) maxx
+      maxy' = min (height-1) maxy
+  liftIO $ copyTilesToImage landChunkTiles mneighbours (IntRect minx' miny' maxx' maxy') img
   texture2DSetDataFromImage tex img False
   pure ()
 

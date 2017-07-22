@@ -292,8 +292,9 @@ makeLandMesh chunkSize tsize res vscale mneighbours ch = do
 updateChunkMesh :: LandChunk -- ^ Where to get data about height from
   -> (Maybe LandChunk, Maybe LandChunk, Maybe LandChunk) -- ^ Optional neighbour tiles in (+X, +Y, +XY) directions
   -> LandMesh -- ^ Buffers to update
+  -> IntRect -- ^ region to update
   -> IO ()
-updateChunkMesh ch mneighbours LandMesh{..} = do
+updateChunkMesh ch mneighbours LandMesh{..} region = do
   let heightmapNeighbours = (\(x, y, _) -> (fmap landChunkHeightmap x, fmap landChunkHeightmap y)) mneighbours
       vertNorms :: SV.Vector VertWithNorm = genHeightVertecies landMeshSize landMeshTileSize landMeshResolution landMeshVScale (landChunkHeightmap ch) heightmapNeighbours
       numVertices = fromIntegral $ SV.length vertNorms
@@ -305,5 +306,5 @@ updateChunkMesh ch mneighbours LandMesh{..} = do
   _ <- SV.unsafeWith vertNorms $ vertexBufferSetData landMeshVertex . castPtr
 
   let tileNeighbours = (\(x, y, xy) -> (fmap landChunkTiles x, fmap landChunkTiles y, fmap landChunkTiles xy)) mneighbours
-  updateDetailTexture tileNeighbours ch landMeshDetailsImg landMeshDetails
+  updateDetailTexture tileNeighbours ch region landMeshDetailsImg landMeshDetails
   modelSetBoundingBox landMeshModel $ calcBoundingBox vertNorms

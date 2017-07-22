@@ -135,7 +135,7 @@ landscapeUpdateHeights :: V2 Int -- ^ Offset of region in tiles
   -> Landscape -> Landscape
 landscapeUpdateHeights (V2 ox oy) (V2 sx sy) f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx) (oy+sy)) $ landscapeUpdatedChunks land
+  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx-1) (oy+sy-1)) $ landscapeUpdatedChunks land
   }
   where
     chsize = landscapeChunkSize land
@@ -170,7 +170,7 @@ landscapeUpdateTiles :: V2 Int -- ^ Offset of region in tiles
   -> Landscape -> Landscape
 landscapeUpdateTiles (V2 ox oy) (V2 sx sy) f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx) (oy+sy)) $ landscapeUpdatedChunks land
+  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx-1) (oy+sy-1)) $ landscapeUpdatedChunks land
   }
   where
     chsize = landscapeChunkSize land
@@ -199,7 +199,7 @@ landscapeUpdateChunk ::
   -> V2 Int -- ^ Chunk index
   -> IntRect -- ^ Region of chunk to update
   -> IO ()
-landscapeUpdateChunk LoadedLandscape{..} pos _ = do
+landscapeUpdateChunk LoadedLandscape{..} pos region = do
   let land = loadedLandDatum
       mchunk = M.lookup pos $ landscapeChunks land
       mmesh = M.lookup pos loadedLandChunks
@@ -207,7 +207,7 @@ landscapeUpdateChunk LoadedLandscape{..} pos _ = do
       my  = M.lookup (pos + V2 0 1) $ landscapeChunks land
       mxy = M.lookup (pos + V2 1 1) $ landscapeChunks land
   case (mchunk, mmesh) of
-    (Just chunk, Just mesh) -> updateChunkMesh chunk (mx, my, mxy) mesh
+    (Just chunk, Just mesh) -> updateChunkMesh chunk (mx, my, mxy) mesh region
     _ -> pure ()
 
 -- | Update loaded landscape and sync changes with engine resources
