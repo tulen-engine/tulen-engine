@@ -5,6 +5,7 @@ module Game.Tulen.Internal.API.Math(
 import Game.Tulen.Internal.API.Helpers
 import Game.Tulen.API.Math
 import Graphics.Urho3D
+import qualified Linear as L
 
 instance ToAPI Vector2 (V2 Float) where
   toAPI (Vector2 xv yv) = V2 xv yv
@@ -60,4 +61,28 @@ instance ToAPI IntVector2 (V2 Int) where
 
 instance FromAPI IntVector2 (V2 Int) where
   fromAPI (V2 xv yv) = IntVector2 (fromIntegral xv) (fromIntegral yv)
+  {-# INLINE fromAPI #-}
+
+instance ToAPI (L.V2 a) (V2 a) where
+  toAPI (L.V2 xv yv) = V2 xv yv
+  {-# INLINE toAPI #-}
+
+instance ToAPI (L.V3 a) (V3 a) where
+  toAPI (L.V3 xv yv zv) = V3 xv yv zv
+  {-# INLINE toAPI #-}
+
+instance ToAPI (L.V4 a) (V4 a) where
+  toAPI (L.V4 xv yv zv wv) = V4 xv yv zv wv
+  {-# INLINE toAPI #-}
+
+instance FromAPI (L.V2 a) (V2 a) where
+  fromAPI (V2 xv yv) = L.V2 xv yv
+  {-# INLINE fromAPI #-}
+
+instance FromAPI (L.V3 a) (V3 a) where
+  fromAPI (V3 xv yv zv) = L.V3 xv yv zv
+  {-# INLINE fromAPI #-}
+
+instance FromAPI (L.V4 a) (V4 a) where
+  fromAPI (V4 xv yv zv wv) = L.V4 xv yv zv wv
   {-# INLINE fromAPI #-}

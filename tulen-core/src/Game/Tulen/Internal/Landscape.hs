@@ -129,20 +129,21 @@ landscapeTilesFromFunction f land = land {
 
 -- | Set heights in landscape for region from function. Coordinates passed in the function are world coordinates and
 -- outup height is in world units too.
-landscapeUpdateHeights :: V2 Int -- ^ Offset of region in tiles
-  -> V2 Int -- ^ Size of region in tiles
+landscapeUpdateHeights :: V2 Float -- ^ Offset of region in world units
+  -> V2 Float -- ^ Size of region in world units
   -> (V2 Float -> Float -> Float)
   -> Landscape -> Landscape
 landscapeUpdateHeights (V2 ox oy) (V2 sx sy) f land = land {
     landscapeChunks = M.mapWithKey updChunk $ landscapeChunks land
-  , landscapeUpdatedChunks = S.insert (IntRect ox oy (ox+sx-1) (oy+sy-1)) $ landscapeUpdatedChunks land
+  , landscapeUpdatedChunks = S.insert updRect $ landscapeUpdatedChunks land
   }
   where
+    updRect = IntRect (floor ox) (floor oy) (floor ox + ceiling sx - 1) (floor oy + ceiling sy - 1)
     chsize = landscapeChunkSize land
-    ox' = ox `div` chsize
-    oy' = oy `div` chsize
-    sx' = ((ox + abs sx) `div` chsize) - ox' + 1
-    sy' = ((oy + abs sy) `div` chsize) - oy' + 1
+    ox' = floor ox `div` chsize
+    oy' = floor oy `div` chsize
+    sx' = ((floor ox + (abs . ceiling) sx) `div` chsize) - ox' + 1
+    sy' = ((floor oy + (abs . ceiling) sy) `div` chsize) - oy' + 1
     v2 v = V2 v v
     chunkSize = fmap fromIntegral . v2 $ chsize
     tileScale =  v2 (landscapeTileScale land)
@@ -156,8 +157,8 @@ landscapeUpdateHeights (V2 ox oy) (V2 sx sy) f land = land {
             y = height - y'
             chunkPoint = chunkOrigin + chunkSize * tileScale * fmap fromIntegral (V2 x y) / fmap fromIntegral (V2 width height)
             h = getter p * landscapeVerticalScale land
-            in if    chunkPoint ^. _x >= fromIntegral ox && chunkPoint ^. _x < fromIntegral (ox+sx)
-                  && chunkPoint ^. _y >= fromIntegral oy && chunkPoint ^. _y < fromIntegral (oy+sy)
+            in if    chunkPoint ^. _x >= ox && chunkPoint ^. _x < ox+sx
+                  && chunkPoint ^. _y >= oy && chunkPoint ^. _y < oy+sy
                 then f chunkPoint h / landscapeVerticalScale land
                 else getter p
           in chunk { landChunkHeightmap = updHeightmap $ landChunkHeightmap chunk}
@@ -251,8 +252,8 @@ landscapeAddCircleHeights :: V2 Float -- ^ Center of circle (world units)
 landscapeAddCircleHeights center size@(V2 sx sy) h l = landscapeUpdateHeights corner (2 * tileSize) f l
   where
     tsize = landscapeTileScale l
-    tileSize = fmap ceiling $ size / V2 tsize tsize
-    corner = fmap floor $ center - size
+    tileSize = size / V2 tsize tsize
+    corner = center - size
     f p v = let
       V2 x y = p - center
       e2  = 1 - x^2 / sx^2 - y^2 / sy^2

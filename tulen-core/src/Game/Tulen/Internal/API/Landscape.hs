@@ -8,7 +8,9 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.STM
+import Data.Foldable (toList)
 import Game.Tulen.Internal.API.Helpers
+import Game.Tulen.Internal.API.Math
 import Game.Tulen.Internal.ExternalRef
 import Game.Tulen.Internal.Landscape
 import Game.Tulen.Internal.Monad
@@ -17,8 +19,6 @@ import Linear
 import qualified Game.Tulen.API.Landscape as API
 import qualified Game.Tulen.API.Math as API
 import qualified Game.Tulen.API.Resource as API
-
-import Data.Foldable (toList)
 
 instance ToAPI (Int, TileInfo) API.TileInfo where
   toAPI (n, tinfo) = API.TileInfo {
@@ -49,3 +49,15 @@ instance API.LandscapeMonad Spider TulenM where
       takeMVar notifyVar
       pure $ API.TileId $ fromIntegral oldTile
   {-# INLINE tileSetter #-}
+
+  heightSetter e = do
+    core <- ask
+    performEventAsync $ ffor e $ \(API.Rect minx miny maxx maxy, f) -> do
+      notifyVar <- liftIO newEmptyMVar
+      let offset = realToFrac <$> V2 minx miny
+          size = realToFrac <$> V2 (maxx - minx) (maxy - miny)
+          patchLand = landscapeUpdateHeights offset size (\p -> realToFrac . f (toAPI $ fmap (realToFrac :: Float -> Double) p) . realToFrac)
+          notify = putMVar notifyVar ()
+      atomically $ writeTChan (coreLandscapeChan core) (patchLand, notify)
+      takeMVar notifyVar
+  {-# INLINE heightSetter #-}
