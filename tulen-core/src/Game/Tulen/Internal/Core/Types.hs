@@ -2,17 +2,24 @@ module Game.Tulen.Internal.Core.Types(
     Core(..)
   , CoreConfig(..)
   , defaultCoreConfig
+  , UIElementId(..)
   ) where
 
 import Control.Concurrent.STM
+import Data.Bimap (Bimap)
+import Data.Data
 import Data.IORef
 import Data.Map.Strict (Map)
 import Foreign
 import Game.Tulen.Internal.Camera.Types
 import Game.Tulen.Internal.ExternalRef
 import Game.Tulen.Internal.Landscape.Types
+import GHC.Generics
 import Graphics.Urho3D
 import Reflex.Spider
+
+newtype UIElementId = UIElementId { unUIElementId :: Int }
+  deriving (Eq, Ord, Show, Read, Generic, Data)
 
 -- | Main context of engine. Here goes all referencies to internal resources.
 -- Core is used as entry point for game.
@@ -32,6 +39,7 @@ data Core = Core {
 , coreRenderer      :: Ptr Renderer
 , coreLandscape     :: ExternalRef Spider LoadedLandscape -- ^ TODO: replace with loaded map reference
 , coreLandscapeChan :: TChan (Landscape -> Landscape, IO ()) -- ^ Queue of landscape changes, IO action notifies sender that land is patched
+, coreUIElements    :: TVar (Bimap UIElementId (Ptr UIElement), Int)
 }
 
 -- | Additional runtime configuration of engine core.

@@ -1,6 +1,5 @@
 module Game.Tulen.API.Camera(
-    ViewPoint
-  , HitPoint(..)
+    HitPoint(..)
   , CameraMonad(..)
   ) where
 
@@ -8,10 +7,6 @@ import Game.Tulen.API.Landscape
 import Game.Tulen.API.Math
 import GHC.Generics
 import Reflex
-
--- | Point in viewport. Origin is top-left corner and X axis goes right, Y axis
--- goes down. Units are pixels.
-type ViewPoint = V2 Int
 
 -- | Result of raycast
 data HitPoint = HitPoint {

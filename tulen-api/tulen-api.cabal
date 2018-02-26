@@ -18,10 +18,12 @@ library
   exposed-modules:
     Game.Tulen.API
     Game.Tulen.API.Camera
+    Game.Tulen.API.KeyBoard
     Game.Tulen.API.Landscape
     Game.Tulen.API.Math
     Game.Tulen.API.Mouse
     Game.Tulen.API.Resource
+    Game.Tulen.API.UI.Element
   build-depends:
       base                    >= 4.7        && < 5
     , containers              >= 0.5        && < 0.6
@@ -34,9 +36,12 @@ library
     ConstraintKinds
     DeriveFunctor
     DeriveGeneric
+    FlexibleContexts
     FunctionalDependencies
     MultiParamTypeClasses
+    StandaloneDeriving
     TypeFamilies
+    UndecidableInstances
 
 source-repository head
   type:     git

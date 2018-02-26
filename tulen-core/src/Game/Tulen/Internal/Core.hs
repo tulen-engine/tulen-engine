@@ -18,6 +18,8 @@ import Game.Tulen.Internal.Camera
 import Game.Tulen.Internal.ExternalRef
 import Game.Tulen.Internal.Utils
 
+import qualified Data.Bimap as BM
+
 -- DEBUG
 import Debug.Trace
 import Game.Tulen.Internal.Landscape
@@ -42,6 +44,7 @@ runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
       , withCore coreStop >> maybe (pure ()) withCore coreCustomStop)
     camerasVar <- newTVarIO (mempty, 0)
     landChan <- newTChanIO
+    elementsVar <- newTVarIO (BM.empty, 0)
     coreRef <- newIORef Core {
         coreApplication = app
       , coreScene = error "Scene not initialized at startup"
@@ -58,6 +61,7 @@ runCore cfg@CoreConfig{..} m = withObject () $ \context -> do
       , coreRenderer = error "Renderer not initialized at startup"
       , coreLandscape = error "Landscape variable is accessible only inside reactive monad"
       , coreLandscapeChan = landChan
+      , coreUIElements = elementsVar
       }
   applicationRun app
 

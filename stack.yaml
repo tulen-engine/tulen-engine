@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-8.22
+resolver: lts-10.7
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -45,7 +45,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/reflex-frp/reflex.git
-    commit: a1092192c61f3dec924a8e2686dfe3440681bab3
+    commit: 6a8c4efe9a181cc2d97900f5a7519c46cb13e0bb
   extra-dep: true
 - location:
     git: https://github.com/tulen-engine/tulen-script.git
@@ -53,10 +53,11 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/Teaspot-Studio/Urho3D-Haskell.git
-    commit: a5b86a34a6b09f01c88163120d106120b0a46f0f
+    commit: f69a0e6459e19498c80283bfcf2a705ef660c9ab
   subdirs:
     - '.'
     - 'urho3d-bindgen'
+  extra-dep: true
 - location:
     git: https://github.com/Teaspot-Studio/inline-c.git
     commit: 29fdcec7292bc1fe0859548de42608a5a243df10
@@ -69,11 +70,15 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- aeson-1.2.1.0
-- prim-uniq-0.1.0.1
-- ref-tf-0.4.0.1
-- servant-0.11
-- servant-docs-0.10.0.1
+  - prim-uniq-0.1.0.1
+# - aeson-1.2.1.0
+# - haskell-src-meta-0.7.0.1
+# - prim-uniq-0.1.0.1
+# - ref-tf-0.4.0.1
+# - repa-3.4.1.3
+# - servant-0.11
+# - servant-docs-0.10.0.1
+# - syb-0.6
 
 # Override default flag values for local packages and extra-deps
 flags: {}

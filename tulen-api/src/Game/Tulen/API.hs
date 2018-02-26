@@ -1,10 +1,12 @@
 module Game.Tulen.API(
     TulenMonad
   , module Game.Tulen.API.Camera
+  , module Game.Tulen.API.KeyBoard
   , module Game.Tulen.API.Landscape
   , module Game.Tulen.API.Math
   , module Game.Tulen.API.Mouse
   , module Game.Tulen.API.Resource
+  , module Game.Tulen.API.UI.Element
   -- * Reexports of control primitives
   , Reflex(..)
   , MonadAppHost
@@ -79,21 +81,25 @@ module Game.Tulen.API(
   ) where
 
 import Data.Align
+import Data.Dependent.Map (DMap)
 import Data.These
 import Game.Tulen.API.Camera
+import Game.Tulen.API.KeyBoard
 import Game.Tulen.API.Landscape
 import Game.Tulen.API.Math
 import Game.Tulen.API.Mouse
 import Game.Tulen.API.Resource
+import Game.Tulen.API.UI.Element
 import Reflex hiding (performEvent_, performEvent, getPostBuild)
 import Reflex.Host.App
 import Reflex.Host.Class
-import Data.Dependent.Map (DMap)
 
 -- | All partial APIs collected in one big API requirement
 type TulenMonad t m = (
     MonadAppHost t m
   , MouseMonad t m
+  , KeyBoardMonad t m
   , LandscapeMonad t m
   , CameraMonad t m
+  , UIElementMonad t m
   )
