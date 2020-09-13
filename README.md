@@ -16,7 +16,7 @@ implement your ideas.
 resource management and graphical scripting.
 
 - Expression power for an experienced user. If graphical scripting is not enough,
-an user can switch to powerful underlying language (Haskell) and define so much
+an user can switch to powerful underlying language (Rust) and define so much
 abstraction that he need.
 
 - Fork and go. Feature to embed all your script into engine, change the core and
@@ -28,40 +28,7 @@ platforms are possible in future.
 - Built-in networking with synchronization. Minimum hassle with implementing
 multiplayer games.
 
-How to build
-============
+# Current status
 
-## Compilation of Urho3D
-
-Urho3D is rendering engine that is used for internal implementation. Urho3D should be configured with following options:
-
-TODO: add other platform instructions.
-
-``` bash
-git clone https://github.com/urho3d/Urho3D.git
-cd Urho3D
-git checkout ce69ad556e070d965ad9bda74ae2c441cc59f7be
-mkdir build
-cd build
-
-cmake .. -DURHO3D_SAMPLES=1 -DURHO3D_EXTRAS=1 -DURHO3D_LIB_TYPE=SHARED -DCMAKE_INSTALL_PREFIX:PATH=/usr
-
-make
-sudo make install
-```
-
-Also you need to adjust paths at the end of `stack.yml`:
-
-```
-extra-lib-dirs:
-- /usr/lib64/Urho3D
-extra-include-dirs:
-- /usr/include
-- /usr/include/Urho3D/ThirdParty
-```
-
-## Compilation of the engine
-
-You need [stack](https://haskell-lang.org/get-started):
-
-1. `stack install`
+It is on the earliest stages of developing. API will be broken very often and
+the project is not ready for any use yet.

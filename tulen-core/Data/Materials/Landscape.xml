@@ -1,7 +1,0 @@
-<material>
-    <technique name="Techniques/LandscapeBlend.xml" />
-    <!-- <texture unit="0" name="Textures/LandscapeTiles.png"/> -->
-    <!-- <texture unit="1" name="Textures/Tileset.xml" /> -->
-    <parameter name="MatSpecColor" value="0 0 0 16" />
-    <parameter name="ChunkSize" value="10"/>
-</material>
